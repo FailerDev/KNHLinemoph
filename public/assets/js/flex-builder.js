@@ -187,6 +187,38 @@
     return sel
   }
 
+  /** รายชื่อตัวแปรที่แทรกลงในค่าได้ — ตัวแปรระบบ + รายการข้อมูลทุก item */
+  function availableVariables() {
+    const data = window.FLEX_BUILDER_DATA || {}
+    const sys = (data.systemVars || []).map((v) => ({ key: v.key, label: v.label }))
+    const items = (data.itemVars || []).map((v) => ({
+      key: v.key,
+      label: v.result_mode === 'rows' ? `${v.name} (จำนวนแถว)` : v.name,
+    }))
+    return sys.concat(items)
+  }
+
+  /**
+   * select เล็ก ๆ สำหรับแทรก {ตัวแปร} ลงในช่องค่า โดยไม่ต้องพิมพ์ชื่อเอง
+   * เลือกแล้วเรียก onPick แล้วรีเซ็ตกลับเป็นตัวเลือกแรกเสมอ ตัวมันเองไม่ถือค่า
+   */
+  function variablePicker(onPick, ariaLabel) {
+    const vars = availableVariables()
+    const sel = el('select', {
+      class: 'form-select form-select-sm flex-var-picker',
+      'aria-label': ariaLabel || 'แทรกตัวแปร',
+      title: 'แทรกตัวแปรจากรายการข้อมูล',
+    })
+    sel.appendChild(el('option', { value: '', text: vars.length ? 'แทรกตัวแปร…' : '(ยังไม่มีรายการข้อมูล)' }))
+    vars.forEach((v) => sel.appendChild(el('option', { value: v.key, text: `${v.label} {${v.key}}` })))
+    sel.addEventListener('change', () => {
+      if (!sel.value) return
+      onPick(sel.value)
+      sel.value = ''
+    })
+    return sel
+  }
+
   function subRowControls(list, index, rerender) {
     const box = el('div', { class: 'd-flex flex-column gap-1' })
     box.appendChild(
@@ -279,7 +311,15 @@
         const row = el('div', { class: 'flex-subrow' })
         const grid = el('div', { class: 'flex-grow-1 d-flex flex-column gap-1' })
         grid.appendChild(textInput(cell.label, (v) => { cell.label = v; touch() }, { placeholder: 'ป้าย', ariaLabel: `ป้ายช่องที่ ${i + 1}` }))
-        grid.appendChild(textInput(cell.value, (v) => { cell.value = v; touch() }, { placeholder: 'ค่า เช่น {vn}', ariaLabel: `ค่าช่องที่ ${i + 1}` }))
+        const valueRow = el('div', { class: 'd-flex gap-1' })
+        const valueInput = textInput(cell.value, (v) => { cell.value = v; touch() }, { placeholder: 'ค่า เช่น {vn}', ariaLabel: `ค่าช่องที่ ${i + 1}` })
+        valueRow.appendChild(valueInput)
+        valueRow.appendChild(variablePicker((key) => {
+          cell.value = `{${key}}`
+          valueInput.value = cell.value
+          touch()
+        }, `แทรกตัวแปรในค่าช่องที่ ${i + 1}`))
+        grid.appendChild(valueRow)
         const pair = el('div', { class: 'd-flex gap-1' })
         pair.appendChild(textInput(cell.unit, (v) => { cell.unit = v; touch() }, { placeholder: 'หน่วย', ariaLabel: `หน่วยช่องที่ ${i + 1}` }))
         pair.appendChild(selectInput(TONES, cell.tone || 'muted', (v) => { cell.tone = v; touch() }, { ariaLabel: `โทนสีช่องที่ ${i + 1}` }))
@@ -300,8 +340,16 @@
         const wrap = el('div', { class: 'flex-subrow' })
         const grid = el('div', { class: 'flex-grow-1 d-flex flex-column gap-1' })
         grid.appendChild(textInput(row.label, (v) => { row.label = v; touch() }, { placeholder: 'ป้าย', ariaLabel: `ป้ายแถวที่ ${i + 1}` }))
+        const valueRow = el('div', { class: 'd-flex gap-1' })
+        const valueInput = textInput(row.value, (v) => { row.value = v; touch() }, { placeholder: 'ค่า', ariaLabel: `ค่าแถวที่ ${i + 1}` })
+        valueRow.appendChild(valueInput)
+        valueRow.appendChild(variablePicker((key) => {
+          row.value = `{${key}}`
+          valueInput.value = row.value
+          touch()
+        }, `แทรกตัวแปรในค่าแถวที่ ${i + 1}`))
+        grid.appendChild(valueRow)
         const pair = el('div', { class: 'd-flex gap-1' })
-        pair.appendChild(textInput(row.value, (v) => { row.value = v; touch() }, { placeholder: 'ค่า', ariaLabel: `ค่าแถวที่ ${i + 1}` }))
         pair.appendChild(selectInput(TONES, row.tone || 'muted', (v) => { row.tone = v; touch() }, { ariaLabel: `โทนสีแถวที่ ${i + 1}` }))
         grid.appendChild(pair)
         wrap.appendChild(grid)

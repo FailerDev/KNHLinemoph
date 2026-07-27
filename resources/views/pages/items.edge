@@ -2,18 +2,24 @@
   @slot('main')
     <div class="card-modern mb-4">
       <div class="card-modern-header">
-        <h2><i class="bi bi-database text-brand"></i> รายการข้อมูล (SQL items) <span class="text-muted-soft">({{ items.length }})</span></h2>
+        <h2><i class="bi bi-database text-brand" aria-hidden="true"></i> รายการข้อมูล (SQL items) <span class="text-muted-soft">({{ items.length }})</span></h2>
         <button class="btn-modern btn-brand" onclick="Items.openNew()">
-          <i class="bi bi-plus-lg"></i> เพิ่มรายการ
+          <i class="bi bi-plus-lg" aria-hidden="true"></i> เพิ่มรายการ
         </button>
       </div>
       <div class="card-modern-body" style="padding:0;">
         @if(items.length === 0)
           <div class="empty-state">
-            <i class="bi bi-database"></i>
+            <i class="bi bi-database" aria-hidden="true"></i>
             <h4>ยังไม่มีรายการข้อมูล</h4>
           </div>
         @else
+          <div style="padding:10px 16px;border-bottom:1px solid var(--border);">
+            <div class="input-group input-group-sm" style="max-width:320px;">
+              <span class="input-group-text" style="background:var(--bg-muted);border-color:var(--border);"><i class="bi bi-search text-muted-soft" aria-hidden="true"></i></span>
+              <input type="text" class="form-control" id="itemSearch" placeholder="ค้นหารายการ..." oninput="Items.filter(this.value)" style="border-color:var(--border);" aria-label="ค้นหารายการข้อมูล">
+            </div>
+          </div>
           <div class="table-responsive">
             <table class="table-modern">
               <thead>
@@ -38,7 +44,14 @@
                         <small>{{ i.his || 'hos' }}</small>
                       @end
                     </td>
-                    <td><small class="text-muted-soft">{{ i.description ?? '—' }}</small></td>
+                    <td>
+                      <small class="text-muted-soft">{{ i.description ?? '—' }}</small>
+                      @if(i.result_mode === 'joined')
+                        <span class="badge-modern badge-info" style="font-size:10px;margin-left:4px;" title="Row Template: {{ (i.row_template || '').slice(0,40) }}">หลายแถว → ข้อความ</span>
+                      @elseif(i.result_mode === 'rows')
+                        <span class="badge-modern badge-info" style="font-size:10px;margin-left:4px;">หลายแถว → ตาราง Flex</span>
+                      @end
+                    </td>
                     <td>
                       @if(i.is_active)
                         <span class="badge-modern badge-success">เปิด</span>
@@ -47,14 +60,14 @@
                       @end
                     </td>
                     <td class="text-end">
-                      <button class="btn-modern btn-ghost btn-sm btn-icon" onclick="Items.test({{ i.id }})" title="ทดสอบ">
-                        <i class="bi bi-play-circle"></i>
+                      <button class="btn-modern btn-ghost btn-sm btn-icon" onclick="Items.test({{ i.id }})" title="ทดสอบ" aria-label="ทดสอบ {{ i.name }}">
+                        <i class="bi bi-play-circle" aria-hidden="true"></i>
                       </button>
-                      <button class="btn-modern btn-soft btn-sm btn-icon" onclick='Items.openEdit({{{ JSON.stringify(i) }}})' title="แก้ไข">
-                        <i class="bi bi-pencil"></i>
+                      <button class="btn-modern btn-soft btn-sm btn-icon" onclick="Items.openEdit({{ i.id }})" title="แก้ไข" aria-label="แก้ไข {{ i.name }}">
+                        <i class="bi bi-pencil" aria-hidden="true"></i>
                       </button>
-                      <button class="btn-modern btn-danger-soft btn-sm btn-icon" onclick="Items.remove({{ i.id }})" title="ลบ">
-                        <i class="bi bi-trash"></i>
+                      <button class="btn-modern btn-danger-soft btn-sm btn-icon" onclick="Items.remove({{ i.id }})" title="ลบ" aria-label="ลบ {{ i.name }}">
+                        <i class="bi bi-trash" aria-hidden="true"></i>
                       </button>
                     </td>
                   </tr>
@@ -66,7 +79,7 @@
       </div>
     </div>
 
-    <div class="modal fade" id="itemModal" tabindex="-1" aria-hidden="true">
+    <div class="modal fade" id="itemModal" tabindex="-1" aria-hidden="true" aria-labelledby="itemModalTitle">
       <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
           <form id="itemForm" class="form-modern" novalidate>
@@ -74,8 +87,8 @@
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
 
             <div class="modal-header">
-              <h5 class="modal-title" id="itemModalTitle"><i class="bi bi-database text-brand"></i> เพิ่มรายการ</h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              <h5 class="modal-title" id="itemModalTitle"><i class="bi bi-database text-brand" aria-hidden="true"></i> เพิ่มรายการ</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
             </div>
 
             <div class="modal-body">
@@ -93,6 +106,54 @@
                   <label class="form-label">SQL Query *</label>
                   <textarea class="form-control" name="sql_query" rows="6" required style="font-family:ui-monospace,monospace;font-size:13px;"></textarea>
                   <div class="form-text">ใช้ <code>&#123;date&#125;</code> สำหรับวันที่ปัจจุบัน (YYYY-MM-DD)</div>
+                </div>
+                <div class="col-12">
+                  <div style="background:var(--bg-muted);border:1px solid var(--border);border-radius:8px;padding:12px 14px;">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                      <i class="bi bi-table text-brand" aria-hidden="true"></i>
+                      <strong style="font-size:13px;">รูปแบบผลลัพธ์ของ SQL</strong>
+                    </div>
+                    <div class="btn-group w-100 mb-2" role="group" aria-label="รูปแบบผลลัพธ์ของ SQL">
+                      <input type="radio" class="btn-check" name="result_mode" id="modeSingle" value="single" checked
+                             onchange="Items.setResultMode('single')">
+                      <label class="btn btn-outline-secondary btn-sm" for="modeSingle">แถวเดียว</label>
+
+                      <input type="radio" class="btn-check" name="result_mode" id="modeJoined" value="joined"
+                             onchange="Items.setResultMode('joined')">
+                      <label class="btn btn-outline-secondary btn-sm" for="modeJoined">หลายแถว → ข้อความ</label>
+
+                      <input type="radio" class="btn-check" name="result_mode" id="modeRows" value="rows"
+                             onchange="Items.setResultMode('rows')">
+                      <label class="btn btn-outline-secondary btn-sm" for="modeRows">หลายแถว → ตาราง Flex</label>
+                    </div>
+
+                    <div id="modeHintSingle" class="form-text" style="font-size:11px;">
+                      SQL คืนแถวเดียว แต่ละคอลัมน์ใช้เป็น <code>&#123;ชื่อคอลัมน์&#125;</code> ในเทมเพลตได้โดยตรง
+                    </div>
+
+                    <div id="joinedModeWrap" hidden>
+                      <div class="row g-2 mt-1">
+                        <div class="col-md-9">
+                          <label class="form-label" style="font-size:12px;">Row Template * <span class="text-muted-soft">(ใช้ &#123;ชื่อคอลัมน์&#125; ได้)</span></label>
+                          <textarea class="form-control" name="row_template" rows="3"
+                            style="font-family:ui-monospace,monospace;font-size:12px;"
+                            placeholder="เช่น แผนก: {department_name}&#10;จำนวน: {patient_count} ราย&#10;------------------"></textarea>
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label" style="font-size:12px;">Separator</label>
+                          <input type="text" class="form-control" name="row_separator" placeholder="\n"
+                            style="font-family:ui-monospace,monospace;font-size:12px;">
+                          <div class="form-text" style="font-size:10px;">\n = ขึ้นบรรทัด, \t = tab, ลบ = เว้นบรรทัด</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div id="rowsModeHint" class="form-text" style="font-size:11px;" hidden>
+                      SQL คืนได้หลายแถวหลายคอลัมน์ตรง ๆ — ใช้ในบล็อก <strong>ตาราง</strong> ของการ์ด Flex
+                      ที่หน้าเทมเพลต โดยเลือกรายการนี้จากช่อง "รายการข้อมูล" แล้วจับคู่ชื่อคอลัมน์เอง
+                      ไม่ต้องกรอก Row Template
+                    </div>
+                  </div>
                 </div>
                 <div class="col-md-4">
                   <label class="form-label">Database</label>
@@ -119,7 +180,7 @@
 
             <div class="modal-footer">
               <button type="button" class="btn-modern btn-soft" data-bs-dismiss="modal">ยกเลิก</button>
-              <button type="submit" class="btn-modern btn-brand"><i class="bi bi-check-lg"></i> บันทึก</button>
+              <button type="submit" class="btn-modern btn-brand"><i class="bi bi-check-lg" aria-hidden="true"></i> บันทึก</button>
             </div>
           </form>
         </div>
@@ -130,6 +191,9 @@
   @slot('scripts')
     <script>
       (function () {
+        const _itemsMap = {};
+        {{{ JSON.stringify(items) }}}.forEach(i => { _itemsMap[i.id] = i; });
+
         const Items = {
           modal: null,
           init() {
@@ -139,15 +203,25 @@
               this.save();
             });
           },
+          /** สลับส่วนที่แสดงตามรูปแบบผลลัพธ์ที่เลือก */
+          setResultMode(mode) {
+            document.getElementById('modeHintSingle').hidden = mode !== 'single';
+            document.getElementById('joinedModeWrap').hidden = mode !== 'joined';
+            document.getElementById('rowsModeHint').hidden = mode !== 'rows';
+          },
           openNew() {
             const f = document.getElementById('itemForm');
             f.reset();
             f.id.value = '';
             f.is_active.checked = true;
+            f.modeSingle.checked = true;
+            this.setResultMode('single');
             document.getElementById('itemModalTitle').textContent = 'เพิ่มรายการ';
             this.modal.show();
           },
-          openEdit(i) {
+          openEdit(id) {
+            const i = _itemsMap[id];
+            if (!i) return;
             const f = document.getElementById('itemForm');
             f.id.value = i.id;
             f.item_name.value = i.name;
@@ -156,6 +230,11 @@
             f.his_database.value = i.his || '__app__';
             f.description.value = i.description || '';
             f.is_active.checked = !!i.is_active;
+            f.row_template.value = i.row_template || '';
+            f.row_separator.value = i.row_separator || '';
+            const mode = i.result_mode || 'single';
+            f.result_mode.value = mode;
+            this.setResultMode(mode);
             document.getElementById('itemModalTitle').textContent = 'แก้ไขรายการ';
             this.modal.show();
           },
@@ -167,6 +246,12 @@
               this.modal.hide();
               setTimeout(() => location.reload(), 500);
             }
+          },
+          filter(q) {
+            const s = q.trim().toLowerCase()
+            document.querySelectorAll('.table-modern tbody tr').forEach(tr => {
+              tr.style.display = !s || tr.textContent.toLowerCase().includes(s) ? '' : 'none'
+            })
           },
           async remove(id) {
             const ok = await App.confirm({ title: 'ลบรายการ?', text: 'ไม่สามารถย้อนกลับได้', confirmText: 'ลบ', danger: true });

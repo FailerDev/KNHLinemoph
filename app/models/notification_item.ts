@@ -43,6 +43,23 @@ export default class NotificationItem extends BaseModel {
   @column({ columnName: 'result_mode' })
   declare resultMode: 'single' | 'joined' | 'rows'
 
+  /**
+   * โหมดผลลัพธ์ที่ควรบันทึก
+   *
+   * ถ้าผู้เรียกไม่ได้ระบุมา ให้เดาจาก row_template แบบเดียวกับที่ระบบทำก่อนมี
+   * คอลัมน์นี้ — กัน item ที่สร้างใหม่พร้อม row_template ตกไปอยู่โหมด single
+   * ตาม DB default แล้วการรวมหลายแถวพังเงียบ ๆ
+   */
+  static resolveResultMode(
+    requested: string | null | undefined,
+    rowTemplate: string | null | undefined
+  ): 'single' | 'joined' | 'rows' {
+    if (requested === 'single' || requested === 'joined' || requested === 'rows') {
+      return requested
+    }
+    return rowTemplate && rowTemplate.trim() !== '' ? 'joined' : 'single'
+  }
+
   @column.dateTime({ autoCreate: true, columnName: 'created_at' })
   declare createdAt: DateTime
 

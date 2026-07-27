@@ -14,6 +14,17 @@ const SYSTEM_VARS = [
   'date', 'time', 'date_th', 'weekday', 'org_name', 'site_title', 'site_footer',
 ]
 
+/** ป้ายภาษาไทยของตัวแปรระบบ — ใช้เติมตัวเลือกในหน้า builder */
+const SYSTEM_VAR_LABELS: Record<string, string> = {
+  date: 'วันที่ (YYYY-MM-DD)',
+  time: 'เวลา (HH:mm:ss)',
+  date_th: 'วันที่ภาษาไทย',
+  weekday: 'วันในสัปดาห์',
+  org_name: 'ชื่อโรงพยาบาล',
+  site_title: 'ชื่อระบบ',
+  site_footer: 'ท้ายข้อความ',
+}
+
 export default class TemplatesController {
   async index({ view }: HttpContext) {
     const [templates, items, groups] = await Promise.all([
@@ -39,6 +50,7 @@ export default class TemplatesController {
         name: i.itemName,
         result_mode: i.resultMode,
       })),
+      systemVars: SYSTEM_VARS.map((key) => ({ key, label: SYSTEM_VAR_LABELS[key] })),
       lineGroups: groups.map((g) => ({ id: g.id, name: g.groupName })),
     })
   }

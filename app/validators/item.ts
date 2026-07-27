@@ -9,5 +9,8 @@ export const itemSaveValidator = vine.compile(
     his_database: vine.string().trim().maxLength(50).optional(),
     description: vine.string().maxLength(2000).optional(),
     is_active: vine.accepted().optional(),
+    row_template: vine.string().maxLength(5000).optional(),
+    row_separator: vine.string().maxLength(50).optional(),
+    result_mode: vine.enum(['single', 'joined', 'rows']).optional(),
   })
 )

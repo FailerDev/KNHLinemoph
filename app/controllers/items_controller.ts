@@ -22,6 +22,9 @@ export default class ItemsController {
         his: i.hisDatabase,
         description: i.description,
         is_active: !!i.isActive,
+        row_template: i.rowTemplate ?? '',
+        row_separator: i.rowSeparator ?? '',
+        result_mode: i.resultMode,
       })),
       hisDbs: hisDbs.map((d) => ({ name: d.name, label: `${d.name} — ${d.databaseName}` })),
     })
@@ -52,6 +55,18 @@ export default class ItemsController {
     item.hisDatabase = (payload.his_database ?? 'hos').trim() || 'hos'
     item.description = payload.description?.trim() ?? null
     item.isActive = !!payload.is_active
+    item.rowTemplate = payload.row_template?.trim() || null
+    item.rowSeparator = payload.row_separator ?? null
+    // ถ้าไม่ได้ระบุมา เดาจาก row_template แบบเดียวกับที่ระบบทำก่อนมีคอลัมน์นี้
+    // กัน item ที่สร้างพร้อม row_template ตกไปอยู่โหมด single ตาม DB default
+    item.resultMode = NotificationItem.resolveResultMode(payload.result_mode, item.rowTemplate)
+
+    if (item.resultMode === 'joined' && !item.rowTemplate) {
+      return response.json({
+        success: false,
+        message: 'โหมด "หลายแถว (รวมเป็นข้อความ)" ต้องกรอก Row Template ด้วย',
+      })
+    }
 
     try {
       await item.save()
@@ -103,14 +118,17 @@ export default class ItemsController {
     const today = DateTime.now().setZone('Asia/Bangkok').toFormat('yyyy-MM-dd')
     try {
       const sql = item.sqlQuery.replace(/\{date\}/g, today)
-      const row = await HisManager.queryFirst(item.hisDatabase || 'hos', sql, [])
+      const db = item.hisDatabase || 'hos'
+      const result = item.rowTemplate
+        ? await HisManager.query(db, sql, [])
+        : await HisManager.queryFirst(db, sql, [])
       await AuditService.record(ctx, {
         action: 'test_send',
         targetType: 'item',
         targetId: id,
         description: `Test query item '${item.itemName}'`,
       })
-      return response.json({ success: true, message: 'ทดสอบสำเร็จ', data: { result: row } })
+      return response.json({ success: true, message: 'ทดสอบสำเร็จ', data: { result } })
     } catch (err: any) {
       return response.json({ success: false, message: 'ทดสอบไม่สำเร็จ: ' + (err?.message ?? String(err)) })
     }

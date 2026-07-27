@@ -24,6 +24,7 @@
     "#database/*": "./database/*.js",
     "#tests/*": "./tests/*.js",
     "#start/*": "./start/*.js",
+    "#types/*": "./app/types/*.js",
     "#config/*": "./config/*.js",
     "#commands/*": "./commands/*.js"
   },

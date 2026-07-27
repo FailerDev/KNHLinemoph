@@ -4,7 +4,9 @@ import NotificationTemplate from '#models/notification_template'
 import NotificationItem from '#models/notification_item'
 import NotificationLog from '#models/notification_log'
 import LineGroup from '#models/line_group'
-import LineApiService, { type LineApiResult } from '#services/line_api_service'
+import LineApiService, { type LineApiResult, type LineMessage } from '#services/line_api_service'
+import FlexBuilderService from '#services/flex_builder_service'
+import type { BuildContext } from '#types/flex_design'
 import HisManager from '#services/his_manager'
 import ScheduleCalculator from '#services/schedule_calculator'
 import SettingsService from '#services/settings_service'
@@ -29,12 +31,23 @@ export interface ItemData {
   itemName: string
   itemKey: string
   data: Record<string, unknown>
+  /** มีเฉพาะ item ที่ result_mode = 'rows' — แถวดิบสำหรับบล็อกตาราง Flex */
+  rows?: Record<string, unknown>[]
   error?: string
+}
+
+export interface PayloadResult {
+  messageType: 'text' | 'flex'
+  messages: LineMessage[]
+  /** ข้อความที่ลง notification_logs.message_content — flex ใช้ altText */
+  logText: string
+  warnings: string[]
 }
 
 export interface SendResult {
   success: boolean
   message: string
+  warnings: string[]
   itemsData: ItemData[]
   results: Array<{
     groupId: number
@@ -68,7 +81,39 @@ export default class NotificationService {
       if (!safeDate) throw new Error(`Invalid date: ${targetDate}`)
 
       const sql = item.sqlQuery.replace(/\{date\}/g, safeDate)
-      const row = await HisManager.queryFirst(item.hisDatabase || 'hos', sql, [])
+      const db = item.hisDatabase || 'hos'
+
+      const mode = item.resultMode ?? 'single'
+
+      if (mode === 'rows') {
+        const rows = (await HisManager.query(db, sql, [])) as Record<string, unknown>[]
+        return {
+          itemName: item.itemName,
+          itemKey: item.itemKey,
+          // เทมเพลต text ที่อ้าง item โหมดนี้ได้ข้อความบอกจำนวนแถวแทน [object Object]
+          data: { [item.itemKey]: `${rows.length} รายการ` },
+          rows,
+        }
+      }
+
+      if (mode === 'joined') {
+        const rows = await HisManager.query(db, sql, [])
+        const sep = (item.rowSeparator ?? '\\n').replace(/\\n/g, '\n').replace(/\\t/g, '\t')
+        const lines = rows.map((row) => {
+          let line = item.rowTemplate ?? ''
+          for (const [k, v] of Object.entries(row)) {
+            line = line.replace(new RegExp(`\\{${k}\\}`, 'g'), v == null ? '' : String(v))
+          }
+          return line
+        })
+        return {
+          itemName: item.itemName,
+          itemKey: item.itemKey,
+          data: { [item.itemKey]: lines.join(sep) || '—' },
+        }
+      }
+
+      const row = await HisManager.queryFirst(db, sql, [])
       return {
         itemName: item.itemName,
         itemKey: item.itemKey,
@@ -85,10 +130,10 @@ export default class NotificationService {
     }
   }
 
-  static async buildMessage(templateId: number, itemsData: ItemData[]): Promise<string> {
-    const template = await NotificationTemplate.find(templateId)
-    if (!template) throw new Error('Template not found')
-
+  /** แผนที่ค่าตัวแปรทั้งหมด — ระบบ + ข้อมูลจาก item */
+  private static async buildPlaceholders(
+    itemsData: ItemData[]
+  ): Promise<Record<string, string>> {
     const now = DateTime.now().setZone(this.TZ)
     const [orgName, siteTitle, siteFooter] = await Promise.all([
       SettingsService.get('org_name', ''),
@@ -96,37 +141,101 @@ export default class NotificationService {
       SettingsService.get('site_footer', ''),
     ])
 
-    let message = template.templateContent
+    const map: Record<string, string> = buildSystemPlaceholders(now)
+    map['org_name'] = orgName
+    map['site_title'] = siteTitle
+    map['site_footer'] = siteFooter
 
-    // System placeholders
-    const sys = buildSystemPlaceholders(now)
-    sys['org_name']    = orgName
-    sys['site_title']  = siteTitle
-    sys['site_footer'] = siteFooter
-    for (const [k, v] of Object.entries(sys)) {
-      message = message.replace(new RegExp(`\\{${escapeRe(k)}\\}`, 'g'), v)
-    }
-
-    // Item placeholders
     for (const item of itemsData) {
       if (item.error) {
-        const re = new RegExp(`\\{${escapeRe(item.itemKey)}\\}`, 'g')
-        message = message.replace(re, 'ERROR')
+        map[item.itemKey] = 'ERROR'
         continue
       }
       for (const [k, v] of Object.entries(item.data)) {
-        const re = new RegExp(`\\{${escapeRe(k)}\\}`, 'g')
-        message = message.replace(re, v == null ? '0' : String(v))
+        map[k] = v == null ? '0' : String(v)
       }
-      // Fallback: {item_key} → single-column value
+      // Fallback: {item_key} → ค่าคอลัมน์เดียว
       const vals = Object.values(item.data)
-      if (vals.length === 1) {
-        const re = new RegExp(`\\{${escapeRe(item.itemKey)}\\}`, 'g')
-        message = message.replace(re, vals[0] == null ? '0' : String(vals[0]))
+      if (vals.length === 1 && map[item.itemKey] === undefined) {
+        map[item.itemKey] = vals[0] == null ? '0' : String(vals[0])
       }
     }
 
-    return message
+    return map
+  }
+
+  private static buildTables(itemsData: ItemData[]): BuildContext['tables'] {
+    const tables: BuildContext['tables'] = {}
+    for (const item of itemsData) {
+      if (item.rows) tables[item.itemKey] = item.rows
+    }
+    return tables
+  }
+
+  private static substituteAll(
+    template: string,
+    placeholders: Record<string, string>
+  ): string {
+    let out = template
+    for (const [k, v] of Object.entries(placeholders)) {
+      out = out.replace(new RegExp(`\\{${escapeRe(k)}\\}`, 'g'), v)
+    }
+    return out
+  }
+
+  /**
+   * ประกอบ payload ที่พร้อมส่ง — เลือกเส้นทาง text หรือ flex ตามเทมเพลต
+   *
+   * ถ้าคอมไพล์ Flex ล้มเหลว จะถอยไปส่งข้อความธรรมดาแทนเสมอ
+   * เพราะการแจ้งเตือนต้องถึงมือคนรับ ดีกว่าเงียบหายเพราะดีไซน์พัง
+   */
+  static async buildPayload(templateId: number, itemsData: ItemData[]): Promise<PayloadResult> {
+    const template = await NotificationTemplate.find(templateId)
+    if (!template) throw new Error('Template not found')
+
+    const placeholders = await this.buildPlaceholders(itemsData)
+
+    const asText = (): PayloadResult => {
+      const text = this.substituteAll(template.templateContent, placeholders)
+      return { messageType: 'text', messages: [{ type: 'text', text }], logText: text, warnings: [] }
+    }
+
+    if (template.messageType !== 'flex' || !template.flexDesign) {
+      return asText()
+    }
+
+    const ctx: BuildContext = { placeholders, tables: this.buildTables(itemsData) }
+
+    try {
+      const built = FlexBuilderService.build(
+        template.flexDesign,
+        template.altText || template.templateName,
+        ctx
+      )
+      return {
+        messageType: 'flex',
+        messages: [{ type: 'flex', altText: built.altText, contents: built.contents }],
+        logText: built.altText,
+        warnings: built.warnings,
+      }
+    } catch (err: any) {
+      logger.warn({ err, templateId }, 'flex build failed, falling back to plain text')
+
+      let text = ''
+      try {
+        text = FlexBuilderService.buildPlainText(template.flexDesign, ctx).trim()
+      } catch {
+        text = ''
+      }
+      if (!text) text = this.substituteAll(template.templateContent, placeholders)
+
+      return {
+        messageType: 'text',
+        messages: [{ type: 'text', text }],
+        logText: text,
+        warnings: [`คอมไพล์ Flex ล้มเหลว ส่งเป็นข้อความธรรมดาแทน: ${err?.message ?? err}`],
+      }
+    }
   }
 
   /**
@@ -178,7 +287,12 @@ export default class NotificationService {
     if (!tpl) throw new Error('Template not found')
 
     const itemsData: ItemData[] = []
-    const tplVars: string[] = tpl.variables ?? []
+    // เทมเพลต flex ดึงตัวแปรสด ๆ จากนิยามบล็อก เพราะคอลัมน์ variables จะถูกเติม
+    // ให้ถูกต้องตอนบันทึกผ่าน UI ซึ่งยังไม่มีในเฟสนี้
+    const tplVars: string[] =
+      tpl.messageType === 'flex' && tpl.flexDesign
+        ? FlexBuilderService.extractVariables(tpl.flexDesign, tpl.altText ?? undefined)
+        : (tpl.variables ?? [])
     if (tplVars.length > 0) {
       const matchingItems = await NotificationItem.query()
         .whereIn('item_key', tplVars)
@@ -188,7 +302,8 @@ export default class NotificationService {
         if (data) itemsData.push(data)
       }
     }
-    const message = await this.buildMessage(schedule.templateId, itemsData)
+    const payload = await this.buildPayload(schedule.templateId, itemsData)
+    const message = payload.logText
 
     // ---- Send to each active group ----
     const groupIds = (schedule.groupIds ?? []).map(Number)
@@ -198,9 +313,9 @@ export default class NotificationService {
 
     const results: SendResult['results'] = []
     for (const group of groups) {
-      const line = await LineApiService.sendMessage(
+      const line = await LineApiService.sendPayload(
         { apiUrl: group.apiUrl, clientKey: group.clientKey, secretKey: group.secretKey },
-        message
+        payload.messages
       )
 
       try {
@@ -208,9 +323,12 @@ export default class NotificationService {
         log.scheduleId = scheduleId
         log.groupId = group.id
         log.templateId = schedule.templateId
+        log.messageType = payload.messageType
         log.statusCode = line.code
+        log.apiStatus = line.apiStatus
         log.responseText = line.response?.slice(0, 65_535) ?? null
         log.messageContent = message
+        log.payloadJson = JSON.stringify(payload.messages)
         await log.save()
       } catch (err) {
         logger.warn({ err }, 'failed to write notification_log row')
@@ -227,6 +345,7 @@ export default class NotificationService {
     return {
       success: results.length > 0 && results.some((r) => r.line.success),
       message,
+      warnings: payload.warnings,
       itemsData,
       results,
     }
@@ -256,7 +375,9 @@ export default class NotificationService {
     try {
       const log = new NotificationLog()
       log.groupId = group.id
+      log.messageType = 'text'
       log.statusCode = line.code
+      log.apiStatus = line.apiStatus
       log.responseText = line.response?.slice(0, 65_535) ?? null
       log.messageContent = finalMsg
       await log.save()

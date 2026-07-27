@@ -1,0 +1,661 @@
+import { test } from '@japa/runner'
+import FlexBuilderService from '#services/flex_builder_service'
+import type { BuildContext, FlexDesign, TableBlock } from '#types/flex_design'
+
+const emptyCtx: BuildContext = { placeholders: {}, tables: {} }
+
+function design(blocks: FlexDesign['blocks']): FlexDesign {
+  return { version: 1, blocks }
+}
+
+test.group('FlexBuilderService.build — โครงและบล็อกพื้นฐาน', () => {
+  test('คืน bubble ที่มี body เป็น box แนวตั้ง', ({ assert }) => {
+    const result = FlexBuilderService.build(design([]), 'ทดสอบ', emptyCtx)
+    const bubble = result.contents as any
+
+    assert.equal(bubble.type, 'bubble')
+    assert.equal(bubble.size, 'mega')
+    assert.equal(bubble.body.type, 'box')
+    assert.equal(bubble.body.layout, 'vertical')
+    assert.isArray(bubble.body.contents)
+  })
+
+  test('ไม่มี header/footer แยก ใช้ body อย่างเดียว', ({ assert }) => {
+    const d = design([{ id: 'h', type: 'header', title: 'หัวข้อ' }])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+
+    assert.isUndefined(bubble.header)
+    assert.isUndefined(bubble.footer)
+  })
+
+  test('บล็อก header คอมไพล์เป็นกล่องพื้นสีหลักพร้อมหัวข้อ', ({ assert }) => {
+    const d = design([{ id: 'h', type: 'header', title: 'สรุปรายวัน', subtitle: 'รพ.ทดสอบ' }])
+    d.theme = { primary: '#1E3A8A' }
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+    const header = bubble.body.contents[0]
+
+    assert.equal(header.backgroundColor, '#1E3A8A')
+    assert.equal(header.contents[0].text, 'สรุปรายวัน')
+    assert.equal(header.contents[1].text, 'รพ.ทดสอบ')
+  })
+
+  test('header ที่ไม่มี subtitle มีข้อความบรรทัดเดียว', ({ assert }) => {
+    const d = design([{ id: 'h', type: 'header', title: 'หัวข้อ' }])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+
+    assert.lengthOf(bubble.body.contents[0].contents, 1)
+  })
+
+  test('แทนค่า placeholder ใน title, subtitle และ altText', ({ assert }) => {
+    const ctx: BuildContext = {
+      placeholders: { org_name: 'รพ.แก้งสนามนาง', date_th: '27 กรกฎาคม 2569' },
+      tables: {},
+    }
+    const d = design([{ id: 'h', type: 'header', title: '{org_name}', subtitle: '{date_th}' }])
+    const result = FlexBuilderService.build(d, 'สรุป {org_name} {date_th}', ctx)
+    const header = (result.contents as any).body.contents[0]
+
+    assert.equal(header.contents[0].text, 'รพ.แก้งสนามนาง')
+    assert.equal(header.contents[1].text, '27 กรกฎาคม 2569')
+    assert.equal(result.altText, 'สรุป รพ.แก้งสนามนาง 27 กรกฎาคม 2569')
+  })
+
+  test('placeholder ที่ไม่รู้จักคงข้อความเดิมไว้', ({ assert }) => {
+    const d = design([{ id: 'h', type: 'header', title: 'ยอด {unknown_key}' }])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+
+    assert.equal(bubble.body.contents[0].contents[0].text, 'ยอด {unknown_key}')
+  })
+
+  test('altText ว่างใช้ข้อความสำรอง', ({ assert }) => {
+    const result = FlexBuilderService.build(design([]), '   ', emptyCtx)
+    assert.equal(result.altText, 'การแจ้งเตือน')
+  })
+
+  test('บล็อก note ใช้สีตามโทน', ({ assert }) => {
+    const d = design([{ id: 'n', type: 'note', text: 'ค้างบันทึก 18 ราย', tone: 'danger' }])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+    const note = bubble.body.contents[0].contents[0].contents[0]
+
+    assert.equal(note.text, 'ค้างบันทึก 18 ราย')
+    assert.equal(note.color, '#B91C1C')
+  })
+
+  test('note ที่ไม่ระบุโทนใช้ muted', ({ assert }) => {
+    const d = design([{ id: 'n', type: 'note', text: 'หมายเหตุ' }])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+
+    assert.equal(bubble.body.contents[0].contents[0].contents[0].color, '#64748B')
+  })
+
+  test('บล็อก separator คอมไพล์เป็น separator', ({ assert }) => {
+    const d = design([{ id: 's', type: 'separator' }])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+
+    assert.equal(bubble.body.contents[0].contents[0].type, 'separator')
+  })
+
+  test('รายงานจำนวน bytes ของ payload', ({ assert }) => {
+    const result = FlexBuilderService.build(design([]), 'alt', emptyCtx)
+    assert.isAbove(result.bytes, 0)
+  })
+})
+
+test.group('FlexBuilderService.build — kpi, list, image, button', () => {
+  test('kpi จัดเป็นแถวละ columns ช่อง', ({ assert }) => {
+    const d = design([
+      {
+        id: 'k',
+        type: 'kpi',
+        columns: 2,
+        cells: [
+          { label: 'OPD', value: '250', unit: 'ราย', tone: 'info' },
+          { label: 'IPD', value: '45', unit: 'ราย', tone: 'ok' },
+          { label: 'ER', value: '32', unit: 'ราย', tone: 'danger' },
+        ],
+      },
+    ])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+    const rows = bubble.body.contents[0].contents
+
+    assert.lengthOf(rows, 2)
+    assert.lengthOf(rows[0].contents, 2)
+    assert.lengthOf(rows[1].contents, 2)
+  })
+
+  test('แถวสุดท้ายที่ไม่เต็มเติมช่องว่างให้ความกว้างเท่ากัน', ({ assert }) => {
+    const d = design([
+      { id: 'k', type: 'kpi', columns: 2, cells: [{ label: 'OPD', value: '250' }] },
+    ])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+    const row = bubble.body.contents[0].contents[0]
+
+    assert.lengthOf(row.contents, 2)
+    assert.equal(row.contents[1].flex, 1)
+  })
+
+  test('ช่อง kpi ใช้สีพื้นและสีตัวเลขตามโทน', ({ assert }) => {
+    const d = design([
+      { id: 'k', type: 'kpi', columns: 2, cells: [{ label: 'ER', value: '32', tone: 'danger' }] },
+    ])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+    const cell = bubble.body.contents[0].contents[0].contents[0]
+
+    assert.equal(cell.backgroundColor, '#FEF2F2')
+    assert.equal(cell.contents[0].text, 'ER')
+    assert.equal(cell.contents[1].text, '32')
+    assert.equal(cell.contents[1].color, '#B91C1C')
+  })
+
+  test('ช่อง kpi ที่ไม่มี unit มีสองบรรทัด', ({ assert }) => {
+    const d = design([
+      { id: 'k', type: 'kpi', columns: 2, cells: [{ label: 'OPD', value: '250' }] },
+    ])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+
+    assert.lengthOf(bubble.body.contents[0].contents[0].contents[0].contents, 2)
+  })
+
+  test('ค่า kpi ที่แทน placeholder แล้วว่างแสดงเป็นขีด', ({ assert }) => {
+    const ctx: BuildContext = { placeholders: { vn: '' }, tables: {} }
+    const d = design([
+      { id: 'k', type: 'kpi', columns: 2, cells: [{ label: 'OPD', value: '{vn}' }] },
+    ])
+    const bubble = FlexBuilderService.build(d, 'alt', ctx).contents as any
+
+    assert.equal(bubble.body.contents[0].contents[0].contents[0].contents[1].text, '-')
+  })
+
+  test('list สร้างแถวป้ายกับค่าโดยใช้ flex คงที่', ({ assert }) => {
+    const d = design([
+      {
+        id: 'l',
+        type: 'list',
+        rows: [
+          { label: 'X-ray', value: '28' },
+          { label: 'ทันตกรรม', value: '15', tone: 'ok' },
+        ],
+      },
+    ])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+    const rows = bubble.body.contents[0].contents
+
+    assert.lengthOf(rows, 2)
+    assert.equal(rows[0].contents[0].text, 'X-ray')
+    assert.equal(rows[0].contents[1].text, '28')
+    assert.equal(rows[0].contents[1].align, 'end')
+    assert.equal(rows[1].contents[1].color, '#15803D')
+  })
+
+  test('image ที่เป็น https คอมไพล์เป็น image เต็มความกว้าง', ({ assert }) => {
+    const d = design([{ id: 'i', type: 'image', url: 'https://example.com/a.png' }])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+
+    assert.equal(bubble.body.contents[0].type, 'image')
+    assert.equal(bubble.body.contents[0].size, 'full')
+  })
+
+  test('image ที่ไม่ใช่ https ถูกตัดทิ้งพร้อมคำเตือน', ({ assert }) => {
+    const d = design([{ id: 'i', type: 'image', url: 'http://example.com/a.png' }])
+    const result = FlexBuilderService.build(d, 'alt', emptyCtx)
+
+    assert.lengthOf((result.contents as any).body.contents, 0)
+    assert.lengthOf(result.warnings, 1)
+    assert.include(result.warnings[0], 'i')
+  })
+
+  test('button คอมไพล์เป็นปุ่ม uri สีตามธีม', ({ assert }) => {
+    const d = design([
+      { id: 'b', type: 'button', label: 'ดู Dashboard', uri: 'https://example.com' },
+    ])
+    d.theme = { primary: '#1E3A8A' }
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+    const button = bubble.body.contents[0].contents[0]
+
+    assert.equal(button.type, 'button')
+    assert.equal(button.color, '#1E3A8A')
+    assert.equal(button.action.type, 'uri')
+    assert.equal(button.action.label, 'ดู Dashboard')
+    assert.equal(button.action.uri, 'https://example.com')
+  })
+
+  test('button ที่ uri ไม่ถูกต้องถูกตัดทิ้งพร้อมคำเตือน', ({ assert }) => {
+    const d = design([{ id: 'b', type: 'button', label: 'ปุ่ม', uri: 'javascript:alert(1)' }])
+    const result = FlexBuilderService.build(d, 'alt', emptyCtx)
+
+    assert.lengthOf((result.contents as any).body.contents, 0)
+    assert.lengthOf(result.warnings, 1)
+  })
+
+  test('label ของปุ่มถูกตัดที่ 40 ตัวอักษรตามข้อจำกัดของ LINE', ({ assert }) => {
+    const d = design([
+      { id: 'b', type: 'button', label: 'ก'.repeat(60), uri: 'https://example.com' },
+    ])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+
+    assert.lengthOf(bubble.body.contents[0].contents[0].action.label, 40)
+  })
+})
+
+const tableDesign = (over: Partial<TableBlock> = {}) =>
+  design([
+    {
+      id: 't',
+      type: 'table',
+      itemKey: 'doctor_summary',
+      columns: [
+        { source: 'doctor_name', label: 'แพทย์', flex: 5, align: 'start' },
+        { source: 'opd', label: 'OPD', flex: 2, align: 'end', tone: 'info' },
+      ],
+      ...over,
+    },
+  ])
+
+test.group('FlexBuilderService.build — บล็อกตาราง', () => {
+  test('สร้างหัวตารางและแถวข้อมูลจาก ctx.tables', ({ assert }) => {
+    const ctx: BuildContext = {
+      placeholders: {},
+      tables: {
+        doctor_summary: [
+          { doctor_name: 'นพ.สมชาย', opd: 12 },
+          { doctor_name: 'พญ.มานี', opd: 8 },
+        ],
+      },
+    }
+    const bubble = FlexBuilderService.build(tableDesign(), 'alt', ctx).contents as any
+    const rows = bubble.body.contents[0].contents
+
+    assert.lengthOf(rows, 3)
+    assert.equal(rows[0].contents[0].text, 'แพทย์')
+    assert.equal(rows[1].contents[0].text, 'นพ.สมชาย')
+    assert.equal(rows[1].contents[1].text, '12')
+    assert.equal(rows[2].contents[0].text, 'พญ.มานี')
+  })
+
+  test('หัวตารางกับแถวข้อมูลใช้ค่า flex ชุดเดียวกัน', ({ assert }) => {
+    const ctx: BuildContext = {
+      placeholders: {},
+      tables: { doctor_summary: [{ doctor_name: 'นพ.ก', opd: 1 }] },
+    }
+    const bubble = FlexBuilderService.build(tableDesign(), 'alt', ctx).contents as any
+    const [header, row] = bubble.body.contents[0].contents
+
+    assert.deepEqual(
+      header.contents.map((c: any) => [c.flex, c.align]),
+      row.contents.map((c: any) => [c.flex, c.align])
+    )
+  })
+
+  test('ซ่อนหัวตารางได้เมื่อ showHeader เป็น false', ({ assert }) => {
+    const ctx: BuildContext = {
+      placeholders: {},
+      tables: { doctor_summary: [{ doctor_name: 'นพ.ก', opd: 1 }] },
+    }
+    const bubble = FlexBuilderService.build(tableDesign({ showHeader: false }), 'alt', ctx)
+      .contents as any
+
+    assert.lengthOf(bubble.body.contents[0].contents, 1)
+  })
+
+  test('ไม่มีข้อมูลแสดง emptyText', ({ assert }) => {
+    const ctx: BuildContext = { placeholders: {}, tables: { doctor_summary: [] } }
+    const d = tableDesign({ emptyText: 'ยังไม่มีการตรวจวันนี้' })
+    const bubble = FlexBuilderService.build(d, 'alt', ctx).contents as any
+    const rows = bubble.body.contents[0].contents
+
+    assert.equal(rows[rows.length - 1].text, 'ยังไม่มีการตรวจวันนี้')
+  })
+
+  test('ไม่มีข้อมูลและไม่ระบุ emptyText ใช้ข้อความเริ่มต้น', ({ assert }) => {
+    const ctx: BuildContext = { placeholders: {}, tables: { doctor_summary: [] } }
+    const bubble = FlexBuilderService.build(tableDesign(), 'alt', ctx).contents as any
+    const rows = bubble.body.contents[0].contents
+
+    assert.equal(rows[rows.length - 1].text, 'ไม่พบข้อมูล')
+  })
+
+  test('item ที่หาไม่เจอแสดง emptyText พร้อมคำเตือน ไม่ทำให้การ์ดพัง', ({ assert }) => {
+    const result = FlexBuilderService.build(tableDesign(), 'alt', emptyCtx)
+    const rows = (result.contents as any).body.contents[0].contents
+
+    assert.equal(rows[rows.length - 1].text, 'ไม่พบข้อมูล')
+    assert.lengthOf(result.warnings, 1)
+    assert.include(result.warnings[0], 'doctor_summary')
+  })
+
+  test('ตัดแถวที่เกิน maxRows แล้วบอกจำนวนที่เหลือ', ({ assert }) => {
+    const ctx: BuildContext = {
+      placeholders: {},
+      tables: {
+        doctor_summary: Array.from({ length: 20 }, (_, i) => ({
+          doctor_name: `นพ.${i}`,
+          opd: i,
+        })),
+      },
+    }
+    const bubble = FlexBuilderService.build(tableDesign({ maxRows: 5 }), 'alt', ctx).contents as any
+    const rows = bubble.body.contents[0].contents
+
+    // หัวตาราง 1 + ข้อมูล 5 + บรรทัดสรุป 1
+    assert.lengthOf(rows, 7)
+    assert.equal(rows[6].text, '…และอีก 15 รายการ')
+  })
+
+  test('maxRows เกิน 30 ถูกบีบลงเหลือ 30', ({ assert }) => {
+    const ctx: BuildContext = {
+      placeholders: {},
+      tables: {
+        doctor_summary: Array.from({ length: 50 }, (_, i) => ({ doctor_name: `น.${i}`, opd: i })),
+      },
+    }
+    const bubble = FlexBuilderService.build(tableDesign({ maxRows: 999 }), 'alt', ctx)
+      .contents as any
+
+    assert.lengthOf(bubble.body.contents[0].contents, 32)
+  })
+
+  test('ไม่ระบุ maxRows ใช้ค่าเริ่มต้น 15', ({ assert }) => {
+    const ctx: BuildContext = {
+      placeholders: {},
+      tables: {
+        doctor_summary: Array.from({ length: 20 }, (_, i) => ({ doctor_name: `น.${i}`, opd: i })),
+      },
+    }
+    const bubble = FlexBuilderService.build(tableDesign(), 'alt', ctx).contents as any
+
+    assert.lengthOf(bubble.body.contents[0].contents, 17)
+  })
+
+  test('ค่า null ในเซลล์แสดงเป็นขีด และตัวเลขมีคอมมา', ({ assert }) => {
+    const ctx: BuildContext = {
+      placeholders: {},
+      tables: { doctor_summary: [{ doctor_name: null, opd: 1234 }] },
+    }
+    const bubble = FlexBuilderService.build(tableDesign(), 'alt', ctx).contents as any
+    const row = bubble.body.contents[0].contents[1]
+
+    assert.equal(row.contents[0].text, '-')
+    assert.equal(row.contents[1].text, '1,234')
+  })
+
+  test('ตัวเลขที่ driver คืนมาเป็นสตริงก็จัดรูปแบบเหมือนกัน', ({ assert }) => {
+    const ctx: BuildContext = {
+      placeholders: {},
+      tables: { doctor_summary: [{ doctor_name: 'นพ.ก', opd: '9876' }] },
+    }
+    const bubble = FlexBuilderService.build(tableDesign(), 'alt', ctx).contents as any
+
+    assert.equal(bubble.body.contents[0].contents[1].contents[1].text, '9,876')
+  })
+})
+
+test.group('FlexBuilderService.build — ขีดจำกัดขนาด', () => {
+  function bigDesign(noteCount: number) {
+    return design(
+      Array.from({ length: noteCount }, (_, i) => ({
+        id: `n${i}`,
+        type: 'note' as const,
+        text: 'ก'.repeat(200),
+      }))
+    )
+  }
+
+  test('payload ปกติไม่มีคำเตือน', ({ assert }) => {
+    const result = FlexBuilderService.build(bigDesign(1), 'alt', emptyCtx)
+
+    assert.isBelow(result.bytes, 8_000)
+    assert.lengthOf(result.warnings, 0)
+  })
+
+  test('payload เกิน 8KB ยังส่งได้แต่มีคำเตือน', ({ assert }) => {
+    let count = 2
+    let result = FlexBuilderService.build(bigDesign(count), 'alt', emptyCtx)
+    while (result.bytes <= 8_000 && count < 40) {
+      count += 1
+      result = FlexBuilderService.build(bigDesign(count), 'alt', emptyCtx)
+    }
+
+    assert.isAbove(result.bytes, 8_000)
+    assert.isAtLeast(result.warnings.length, 1)
+    assert.include(result.warnings[0], 'ไม่เข้าห้อง LINE')
+  })
+
+  test('payload เกิน 10KB ถูกปฏิเสธพร้อมบอกบล็อกที่ใหญ่ที่สุด', ({ assert }) => {
+    const d = design([
+      { id: 'small', type: 'note', text: 'สั้น' },
+      { id: 'huge', type: 'note', text: 'ก'.repeat(12_000) },
+    ])
+
+    assert.throws(() => FlexBuilderService.build(d, 'alt', emptyCtx), /huge/)
+  })
+
+  test('ตารางที่ข้อมูลจริงยาวเกินงบ ถูกลดแถวลงจนส่งได้ ไม่ throw', ({ assert }) => {
+    // ข้อความไทยกิน 3 bytes ต่อตัวอักษร ตาราง 30 แถวที่มีชื่อแพทย์จริงจึงทะลุ
+    // 10KB เพดานแถวตายตัวรับประกันขนาดไม่ได้ builder ต้องลดแถวเองแทนการโยนทิ้ง
+    const ctx: BuildContext = {
+      placeholders: {},
+      tables: {
+        doctor_summary: Array.from({ length: 50 }, (_, i) => ({
+          doctor_name: `นายแพทย์ทดสอบ ${i}`,
+          opd: i * 111,
+        })),
+      },
+    }
+    const result = FlexBuilderService.build(tableDesign({ maxRows: 30 }), 'alt', ctx)
+    const rows = (result.contents as any).body.contents[0].contents
+
+    assert.isBelow(result.bytes, 10_000)
+    assert.isBelow(rows.length, 32, 'ต้องลดแถวลงจากเพดาน 30')
+    assert.isTrue(
+      result.warnings.some((w) => w.includes('ลดจำนวนแถว')),
+      'ต้องบอกผู้ใช้ว่าแถวถูกลด'
+    )
+  })
+
+  test('บรรทัดสรุปยังบอกจำนวนที่เหลือถูกต้องหลังถูกลดแถว', ({ assert }) => {
+    const ctx: BuildContext = {
+      placeholders: {},
+      tables: {
+        doctor_summary: Array.from({ length: 50 }, (_, i) => ({
+          doctor_name: `นายแพทย์ทดสอบ ${i}`,
+          opd: i * 111,
+        })),
+      },
+    }
+    const result = FlexBuilderService.build(tableDesign({ maxRows: 30 }), 'alt', ctx)
+    const rows = (result.contents as any).body.contents[0].contents
+    const shownDataRows = rows.length - 2 // หักหัวตารางกับบรรทัดสรุป
+
+    assert.equal(rows[rows.length - 1].text, `…และอีก ${50 - shownDataRows} รายการ`)
+  })
+
+  test('ข้อผิดพลาดขนาดเกินเป็น FlexTooLargeError ที่บอกจำนวน bytes', ({ assert }) => {
+    const d = design([{ id: 'huge', type: 'note', text: 'ก'.repeat(12_000) }])
+
+    try {
+      FlexBuilderService.build(d, 'alt', emptyCtx)
+      assert.fail('ควร throw')
+    } catch (err: any) {
+      assert.equal(err.name, 'FlexTooLargeError')
+      assert.isAbove(err.bytes, 10_000)
+      assert.equal(err.heaviestBlockId, 'huge')
+    }
+  })
+})
+
+test.group('FlexBuilderService.buildPlainText', () => {
+  test('ไม่ส่ง ctx คง {placeholder} ไว้', ({ assert }) => {
+    const d = design([{ id: 'h', type: 'header', title: 'สรุป {org_name}' }])
+
+    assert.include(FlexBuilderService.buildPlainText(d), '{org_name}')
+  })
+
+  test('ส่ง ctx แล้วแทนค่า', ({ assert }) => {
+    const d = design([{ id: 'h', type: 'header', title: 'สรุป {org_name}' }])
+    const ctx: BuildContext = { placeholders: { org_name: 'รพ.ทดสอบ' }, tables: {} }
+
+    assert.include(FlexBuilderService.buildPlainText(d, ctx), 'รพ.ทดสอบ')
+  })
+
+  test('kpi และ list กลายเป็นบรรทัด ป้าย: ค่า', ({ assert }) => {
+    const d = design([
+      { id: 'k', type: 'kpi', columns: 2, cells: [{ label: 'OPD', value: '250', unit: 'ราย' }] },
+      { id: 'l', type: 'list', rows: [{ label: 'X-ray', value: '28' }] },
+    ])
+    const text = FlexBuilderService.buildPlainText(d)
+
+    assert.include(text, 'OPD: 250 ราย')
+    assert.include(text, 'X-ray: 28')
+  })
+
+  test('ตารางแสดงคอลัมน์แรกเป็นหัวบรรทัด ที่เหลือคั่นด้วยทับ', ({ assert }) => {
+    const d = design([
+      {
+        id: 't',
+        type: 'table',
+        itemKey: 'doc',
+        columns: [
+          { source: 'name', label: 'แพทย์', flex: 5 },
+          { source: 'opd', label: 'OPD', flex: 2 },
+          { source: 'ipd', label: 'IPD', flex: 2 },
+        ],
+      },
+    ])
+    const ctx: BuildContext = {
+      placeholders: {},
+      tables: { doc: [{ name: 'นพ.สมชาย', opd: 12, ipd: 3 }] },
+    }
+
+    assert.include(FlexBuilderService.buildPlainText(d, ctx), 'นพ.สมชาย: 12 / 3')
+  })
+
+  test('ตารางที่ไม่มีข้อมูลแสดง emptyText', ({ assert }) => {
+    const d = design([
+      {
+        id: 't',
+        type: 'table',
+        itemKey: 'doc',
+        emptyText: 'ไม่มีข้อมูล',
+        columns: [{ source: 'name', label: 'แพทย์', flex: 5 }],
+      },
+    ])
+
+    assert.include(FlexBuilderService.buildPlainText(d), 'ไม่มีข้อมูล')
+  })
+
+  test('ตารางที่เกิน maxRows บอกจำนวนที่เหลือ', ({ assert }) => {
+    const d = design([
+      {
+        id: 't',
+        type: 'table',
+        itemKey: 'doc',
+        maxRows: 2,
+        columns: [{ source: 'name', label: 'แพทย์', flex: 5 }],
+      },
+    ])
+    const ctx: BuildContext = {
+      placeholders: {},
+      tables: { doc: Array.from({ length: 6 }, (_, i) => ({ name: `น.${i}` })) },
+    }
+
+    assert.include(FlexBuilderService.buildPlainText(d, ctx), '…และอีก 4 รายการ')
+  })
+
+  test('บล็อก image ไม่ปรากฏในข้อความสำรอง', ({ assert }) => {
+    const d = design([
+      { id: 'i', type: 'image', url: 'https://example.com/a.png' },
+      { id: 'n', type: 'note', text: 'หมายเหตุ' },
+    ])
+
+    const text = FlexBuilderService.buildPlainText(d)
+    assert.notInclude(text, 'example.com')
+    assert.include(text, 'หมายเหตุ')
+  })
+
+  test('button แสดงข้อความพร้อมลิงก์', ({ assert }) => {
+    const d = design([
+      { id: 'b', type: 'button', label: 'ดู Dashboard', uri: 'https://example.com' },
+    ])
+
+    assert.include(FlexBuilderService.buildPlainText(d), 'ดู Dashboard: https://example.com')
+  })
+
+  test('ไม่มีบรรทัดว่างติดกันเกินสองบรรทัด', ({ assert }) => {
+    const d = design([
+      { id: 'h', type: 'header', title: 'หัวข้อ' },
+      { id: 's', type: 'separator' },
+      { id: 'n', type: 'note', text: 'หมายเหตุ' },
+    ])
+
+    assert.notMatch(FlexBuilderService.buildPlainText(d), /\n{3,}/)
+  })
+})
+
+test.group('FlexBuilderService.extractVariables', () => {
+  test('เก็บ placeholder จาก title, subtitle, kpi, list และ note', ({ assert }) => {
+    const d = design([
+      { id: 'h', type: 'header', title: '{org_name}', subtitle: '{date_th}' },
+      { id: 'k', type: 'kpi', columns: 2, cells: [{ label: 'OPD', value: '{vn}' }] },
+      { id: 'l', type: 'list', rows: [{ label: 'X-ray', value: '{xray}' }] },
+      { id: 'n', type: 'note', text: 'ค้าง {total_no_cc_pe} ราย' },
+    ])
+
+    assert.sameMembers(FlexBuilderService.extractVariables(d), [
+      'org_name',
+      'date_th',
+      'vn',
+      'xray',
+      'total_no_cc_pe',
+    ])
+  })
+
+  test('เก็บ itemKey ของบล็อกตารางด้วย', ({ assert }) => {
+    const d = design([
+      {
+        id: 't',
+        type: 'table',
+        itemKey: 'doctor_summary',
+        columns: [{ source: 'name', label: 'แพทย์', flex: 5 }],
+      },
+    ])
+
+    assert.deepEqual(FlexBuilderService.extractVariables(d), ['doctor_summary'])
+  })
+
+  test('ไม่เก็บชื่อคอลัมน์ของตารางเป็นตัวแปร', ({ assert }) => {
+    const d = design([
+      {
+        id: 't',
+        type: 'table',
+        itemKey: 'doc',
+        columns: [{ source: 'doctor_name', label: 'แพทย์', flex: 5 }],
+      },
+    ])
+
+    assert.notInclude(FlexBuilderService.extractVariables(d), 'doctor_name')
+  })
+
+  test('รวม placeholder จาก altText', ({ assert }) => {
+    assert.deepEqual(FlexBuilderService.extractVariables(design([]), 'สรุป {date} ยอด {vn}'), [
+      'date',
+      'vn',
+    ])
+  })
+
+  test('ไม่มีตัวแปรซ้ำ', ({ assert }) => {
+    const d = design([
+      { id: 'h', type: 'header', title: '{vn}' },
+      { id: 'n', type: 'note', text: '{vn}' },
+    ])
+
+    assert.deepEqual(FlexBuilderService.extractVariables(d), ['vn'])
+  })
+
+  test('เก็บ placeholder จาก label และ uri ของปุ่ม', ({ assert }) => {
+    const d = design([
+      { id: 'b', type: 'button', label: 'ดู {org_name}', uri: 'https://x.test/{date}' },
+    ])
+
+    assert.sameMembers(FlexBuilderService.extractVariables(d), ['org_name', 'date'])
+  })
+})

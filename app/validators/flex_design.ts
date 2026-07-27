@@ -69,13 +69,15 @@ const headerBlock = vine.object({
   background: backgroundOptional('พื้นหลังหัวข้อ'),
   titleColor: hexOptional('สีตัวอักษรหัวข้อ'),
   subtitleColor: hexOptional('สีตัวอักษรบรรทัดรอง'),
+  metricValue: vine.string().trim().maxLength(20).optional(),
+  metricLabel: vine.string().trim().maxLength(40).optional(),
 })
 
 const kpiBlock = vine.object({
   id: blockId,
   type: vine.literal('kpi'),
   columns: vine.number().min(2).max(4),
-  variant: vine.enum(['card', 'chip']).optional(),
+  variant: vine.enum(['card', 'chip', 'stat']).optional(),
   cells: vine
     .array(
       vine.object({
@@ -97,6 +99,7 @@ const listBlock = vine.object({
   type: vine.literal('list'),
   heading: vine.string().trim().maxLength(60).optional(),
   stripeColor: hexOptional('สีแถบข้างของ list'),
+  labelColor: hexOptional('สีป้ายของ list'),
   rows: vine
     .array(
       vine.object({

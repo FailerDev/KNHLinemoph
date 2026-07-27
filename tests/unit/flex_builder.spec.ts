@@ -659,3 +659,332 @@ test.group('FlexBuilderService.extractVariables', () => {
     assert.sameMembers(FlexBuilderService.extractVariables(d), ['org_name', 'date'])
   })
 })
+
+test.group('FlexBuilderService.build — พื้นหลัง gradient และ hero image', () => {
+  test('theme.background เป็น gradient คอมไพล์เป็น background object ไม่ใช่ backgroundColor', ({ assert }) => {
+    const d = design([])
+    d.theme = {
+      background: { type: 'linearGradient', angle: '135deg', startColor: '#4F46E5', endColor: '#06B6D4' },
+    }
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+
+    assert.isUndefined(bubble.body.backgroundColor)
+    assert.deepEqual(bubble.body.background, {
+      type: 'linearGradient',
+      angle: '135deg',
+      startColor: '#4F46E5',
+      endColor: '#06B6D4',
+    })
+  })
+
+  test('theme.background เป็น string ยังคอมไพล์เป็น backgroundColor เหมือนเดิม', ({ assert }) => {
+    const d = design([])
+    d.theme = { background: '#0F172A' }
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+
+    assert.equal(bubble.body.backgroundColor, '#0F172A')
+    assert.isUndefined(bubble.body.background)
+  })
+
+  test('บล็อกรูปที่ hero:true ไปอยู่ที่ bubble.hero ไม่ใช่ body.contents', ({ assert }) => {
+    const d = design([
+      { id: 'i', type: 'image', url: 'https://example.com/a.png', hero: true },
+      { id: 'n', type: 'note', text: 'หมายเหตุ' },
+    ])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+
+    assert.equal(bubble.hero.type, 'image')
+    assert.equal(bubble.hero.url, 'https://example.com/a.png')
+    // body ต้องเหลือแค่บล็อก note ไม่มีรูปซ้ำอยู่ข้างใน
+    assert.lengthOf(bubble.body.contents, 1)
+  })
+
+  test('รูป hero ตัวที่สองถูกลดเป็นรูปธรรมดาพร้อมคำเตือน', ({ assert }) => {
+    const d = design([
+      { id: 'i1', type: 'image', url: 'https://example.com/a.png', hero: true },
+      { id: 'i2', type: 'image', url: 'https://example.com/b.png', hero: true },
+    ])
+    const result = FlexBuilderService.build(d, 'alt', emptyCtx)
+    const bubble = result.contents as any
+
+    assert.equal(bubble.hero.url, 'https://example.com/a.png')
+    assert.lengthOf(bubble.body.contents, 1)
+    assert.equal(bubble.body.contents[0].url, 'https://example.com/b.png')
+    assert.isAtLeast(result.warnings.length, 1)
+  })
+
+  test('ไม่มีบล็อกรูปเลยไม่มี key hero ใน bubble', ({ assert }) => {
+    const d = design([{ id: 'n', type: 'note', text: 'x' }])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+
+    assert.isUndefined(bubble.hero)
+  })
+})
+
+test.group('FlexBuilderService.build — สีกำหนดเองบน kpi/note/header/list', () => {
+  test('kpi cell ที่กำหนด bg/color/border เองทับโทนสำเร็จรูป', ({ assert }) => {
+    const d = design([
+      {
+        id: 'k',
+        type: 'kpi',
+        columns: 2,
+        cells: [{ label: 'OPD', value: '10', bg: '#1E293B', color: '#38BDF8', border: '#334155' }],
+      },
+    ])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+    const cell = bubble.body.contents[0].contents[0].contents[0]
+
+    assert.equal(cell.backgroundColor, '#1E293B')
+    assert.equal(cell.borderColor, '#334155')
+    assert.equal(cell.contents[1].color, '#38BDF8')
+    // กำหนด bg เองแปลว่าเป็นธีมเข้ม ป้ายจึงใช้เทาอ่อนคงที่แทนโทนสำเร็จรูป
+    assert.equal(cell.contents[0].color, '#94A3B8')
+  })
+
+  test('kpi variant chip รวมป้าย+ค่าในบรรทัดเดียว พื้นโปร่งแสง', ({ assert }) => {
+    const d = design([
+      {
+        id: 'k',
+        type: 'kpi',
+        columns: 2,
+        variant: 'chip',
+        cells: [{ label: 'IPD', value: '45' }],
+      },
+    ])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+    const chip = bubble.body.contents[0].contents[0].contents[0]
+
+    assert.equal(chip.cornerRadius, 'xxl')
+    assert.equal(chip.contents[0].text, 'IPD 45')
+  })
+
+  test('kpi variant stat แสดงค่าก่อนแล้วป้ายเล็กด้านล่าง ไม่มีกล่องพื้นสี', ({ assert }) => {
+    const d = design([
+      { id: 'k', type: 'kpi', columns: 2, variant: 'stat', cells: [{ label: 'OPD', value: '10' }] },
+    ])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+    const cell = bubble.body.contents[0].contents[0].contents[0]
+
+    assert.isUndefined(cell.backgroundColor)
+    assert.equal(cell.contents[0].text, '10')
+    assert.equal(cell.contents[1].text, 'OPD')
+  })
+
+  test('note ที่กำหนด bg/color เองทับโทนสำเร็จรูป', ({ assert }) => {
+    const d = design([{ id: 'n', type: 'note', text: 'x', bg: '#0B0F19', color: '#F472B6' }])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+    const box = bubble.body.contents[0].contents[0]
+
+    assert.equal(box.backgroundColor, '#0B0F19')
+    assert.equal(box.contents[0].color, '#F472B6')
+  })
+
+  test('header ที่กำหนด background เป็น gradient + titleColor เอง', ({ assert }) => {
+    const d = design([
+      {
+        id: 'h',
+        type: 'header',
+        title: 'x',
+        background: { type: 'linearGradient', angle: '90deg', startColor: '#F472B6', endColor: '#A78BFA' },
+        titleColor: '#F472B6',
+      },
+    ])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+    const header = bubble.body.contents[0]
+
+    assert.deepEqual(header.background, {
+      type: 'linearGradient', angle: '90deg', startColor: '#F472B6', endColor: '#A78BFA',
+    })
+    assert.equal(header.contents[0].color, '#F472B6')
+  })
+
+  test('header ที่มี metricValue+metricLabel แสดงตัวเลขใหญ่กลางบล็อก', ({ assert }) => {
+    const d = design([
+      { id: 'h', type: 'header', title: 'สรุป', metricValue: '{vn}', metricLabel: 'ราย (OPD)' },
+    ])
+    const ctx: BuildContext = { placeholders: { vn: '250' }, tables: {} }
+    const bubble = FlexBuilderService.build(d, 'alt', ctx).contents as any
+    const header = bubble.body.contents[0]
+
+    assert.equal(header.contents[1].text, '250')
+    assert.equal(header.contents[1].size, '3xl')
+    assert.equal(header.contents[2].text, 'ราย (OPD)')
+  })
+
+  test('header ที่ไม่มี metricLabel คู่กันไม่แสดงตัวเลขใหญ่', ({ assert }) => {
+    const d = design([{ id: 'h', type: 'header', title: 'สรุป', metricValue: '250' }])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+
+    assert.lengthOf(bubble.body.contents[0].contents, 1)
+  })
+
+  test('list ที่มี heading+stripeColor ห่อด้วยแถบสีข้าง', ({ assert }) => {
+    const d = design([
+      {
+        id: 'l',
+        type: 'list',
+        heading: 'ผู้ป่วย',
+        stripeColor: '#2563EB',
+        rows: [{ label: 'OPD', value: '10' }],
+      },
+    ])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+    const wrap = bubble.body.contents[0]
+
+    assert.equal(wrap.layout, 'horizontal')
+    assert.equal(wrap.contents[0].backgroundColor, '#2563EB')
+    assert.equal(wrap.contents[1].contents[0].text, 'ผู้ป่วย')
+  })
+
+  test('list ธรรมดาไม่มี heading/stripeColor ยังเป็นรายการแบนเหมือนเดิม', ({ assert }) => {
+    const d = design([{ id: 'l', type: 'list', rows: [{ label: 'OPD', value: '10' }] }])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+
+    assert.equal(bubble.body.contents[0].layout, 'vertical')
+  })
+
+  test('list.labelColor ทับสีป้ายทุกแถว', ({ assert }) => {
+    const d = design([
+      { id: 'l', type: 'list', labelColor: '#94A3B8', rows: [{ label: 'OPD', value: '10' }] },
+    ])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+
+    assert.equal(bubble.body.contents[0].contents[0].contents[0].color, '#94A3B8')
+  })
+
+  test('list row.color ทับโทนสำเร็จรูปของค่า', ({ assert }) => {
+    const d = design([
+      { id: 'l', type: 'list', rows: [{ label: 'x', value: '10', color: '#E2E8F0' }] },
+    ])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+
+    assert.equal(bubble.body.contents[0].contents[0].contents[1].color, '#E2E8F0')
+  })
+})
+
+test.group('FlexBuilderService.build — separator ตกแต่งและ progress', () => {
+  test('separator ปกติยังเป็นเส้นบางเหมือนเดิม', ({ assert }) => {
+    const d = design([{ id: 's', type: 'separator' }])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+
+    assert.equal(bubble.body.contents[0].contents[0].type, 'separator')
+  })
+
+  test('separator ที่มี thickness กลายเป็นแถบทึบเต็มขอบ ไม่ใช่เส้นบาง', ({ assert }) => {
+    const d = design([{ id: 's', type: 'separator', thickness: '4px', color: '#2563EB' }])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+    const node = bubble.body.contents[0]
+
+    assert.equal(node.type, 'box')
+    assert.equal(node.height, '4px')
+    assert.equal(node.backgroundColor, '#2563EB')
+  })
+
+  test('separator ที่มี background gradient คอมไพล์เป็น background object', ({ assert }) => {
+    const d = design([
+      {
+        id: 's',
+        type: 'separator',
+        thickness: '3px',
+        background: { type: 'linearGradient', angle: '90deg', startColor: '#F472B6', endColor: '#A78BFA' },
+      },
+    ])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+
+    assert.deepEqual(bubble.body.contents[0].background, {
+      type: 'linearGradient', angle: '90deg', startColor: '#F472B6', endColor: '#A78BFA',
+    })
+  })
+
+  test('progress สร้างแถบยาวตาม percent และแสดงค่า', ({ assert }) => {
+    const d = design([
+      {
+        id: 'p',
+        type: 'progress',
+        rows: [{ label: 'X-ray', value: '93', percent: 93, color: '#14B8A6' }],
+      },
+    ])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+    const row = bubble.body.contents[0].contents[0]
+
+    assert.equal(row.contents[0].text, 'X-ray')
+    assert.equal(row.contents[1].contents[0].width, '93%')
+    assert.equal(row.contents[1].contents[0].backgroundColor, '#14B8A6')
+    assert.equal(row.contents[2].text, '93')
+  })
+
+  test('progress percent เกิน 100 ถูกจำกัดไว้ที่ 100', ({ assert }) => {
+    const d = design([{ id: 'p', type: 'progress', rows: [{ label: 'x', value: 'x', percent: 150 }] }])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+
+    assert.equal(bubble.body.contents[0].contents[0].contents[1].contents[0].width, '100%')
+  })
+
+  test('progress percent ติดลบถูกจำกัดไว้ที่ 0', ({ assert }) => {
+    const d = design([{ id: 'p', type: 'progress', rows: [{ label: 'x', value: 'x', percent: -10 }] }])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+
+    assert.equal(bubble.body.contents[0].contents[0].contents[1].contents[0].width, '0%')
+  })
+
+  test('progress ไม่ระบุสีใช้สีเขียวอมฟ้าเป็นค่าเริ่มต้น', ({ assert }) => {
+    const d = design([{ id: 'p', type: 'progress', rows: [{ label: 'x', value: 'x', percent: 50 }] }])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+
+    assert.equal(bubble.body.contents[0].contents[0].contents[1].contents[0].backgroundColor, '#14B8A6')
+  })
+})
+
+test.group('FlexBuilderService.buildPlainText — บล็อกใหม่', () => {
+  test('header ที่มี metric แสดงเป็นบรรทัด "ค่า ป้าย"', ({ assert }) => {
+    const d = design([
+      { id: 'h', type: 'header', title: 'สรุป', metricValue: '250', metricLabel: 'ราย (OPD)' },
+    ])
+
+    assert.include(FlexBuilderService.buildPlainText(d), '250 ราย (OPD)')
+  })
+
+  test('list heading ปรากฏเป็นบรรทัดแรกของกลุ่ม', ({ assert }) => {
+    const d = design([
+      { id: 'l', type: 'list', heading: 'ผู้ป่วย', rows: [{ label: 'OPD', value: '10' }] },
+    ])
+    const text = FlexBuilderService.buildPlainText(d)
+
+    assert.include(text, 'ผู้ป่วย')
+    assert.include(text, 'OPD: 10')
+  })
+
+  test('progress แสดงเป็นบรรทัด "ป้าย: ค่า (percent%)"', ({ assert }) => {
+    const d = design([
+      { id: 'p', type: 'progress', rows: [{ label: 'X-ray', value: '93', percent: 93 }] },
+    ])
+
+    assert.include(FlexBuilderService.buildPlainText(d), 'X-ray: 93 (93%)')
+  })
+})
+
+test.group('FlexBuilderService.extractVariables — บล็อกใหม่', () => {
+  test('เก็บ placeholder จาก metricValue/metricLabel ของ header', ({ assert }) => {
+    const d = design([
+      { id: 'h', type: 'header', title: 'x', metricValue: '{vn}', metricLabel: 'ราย {org_name}' },
+    ])
+
+    assert.sameMembers(FlexBuilderService.extractVariables(d), ['vn', 'org_name'])
+  })
+
+  test('เก็บ placeholder จาก heading ของ list', ({ assert }) => {
+    const d = design([
+      { id: 'l', type: 'list', heading: '{org_name}', rows: [{ label: 'x', value: '{vn}' }] },
+    ])
+
+    assert.sameMembers(FlexBuilderService.extractVariables(d), ['org_name', 'vn'])
+  })
+
+  test('เก็บ placeholder จาก progress rows', ({ assert }) => {
+    const d = design([
+      { id: 'p', type: 'progress', rows: [{ label: '{name}', value: '{val}', percent: 50 }] },
+    ])
+
+    assert.sameMembers(FlexBuilderService.extractVariables(d), ['name', 'val'])
+  })
+})

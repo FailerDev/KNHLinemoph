@@ -1,10 +1,12 @@
 import type {
+  BackgroundValue,
   BuildContext,
   BuildResult,
   FlexBlock,
   FlexDesign,
   FlexTheme,
   FlexTone,
+  ImageBlock,
 } from '#types/flex_design'
 
 const WARN_BYTES = 8_000
@@ -90,13 +92,23 @@ function clampRows(requested: number | undefined): number {
 }
 
 /**
+ * แปลงพื้นหลัง (สีทึบหรือ gradient) เป็น property ที่ LINE Flex ต้องการ
+ * สีทึบใช้ backgroundColor, gradient ใช้ background (คนละ key กัน)
+ */
+function backgroundStyle(v: BackgroundValue): Record<string, unknown> {
+  if (typeof v === 'string') return { backgroundColor: v }
+  return { background: v }
+}
+
+/**
  * FlexBuilderService — คอมไพล์นิยามบล็อกเป็น LINE Flex bubble
  *
  * เป็น pure function โดยตั้งใจ: ไม่แตะ DB ไม่ยิง HTTP ไม่อ่านเวลาปัจจุบัน
  * ทุกอย่างที่ต้องใช้ส่งเข้ามาทาง BuildContext
  *
  * ใช้ body อย่างเดียว ไม่มี header/footer แยก ตาม MOPH_FLEX_GUIDE.md ข้อ 3
- * ที่ระบุว่ารูปแบบนี้ใช้จริงในโปรดักชันมาแล้ว
+ * ที่ระบุว่ารูปแบบนี้ใช้จริงในโปรดักชันมาแล้ว (hero เป็นข้อยกเว้นเดียว — LINE
+ * เก็บมันไว้เป็น property คนละอันจาก body โดยธรรมชาติของสเปก ไม่ใช่ทางเลือกของเรา)
  */
 export default class FlexBuilderService {
   /**
@@ -165,21 +177,38 @@ export default class FlexBuilderService {
       background: design.theme?.background || DEFAULT_THEME.background,
     }
 
+    let heroNode: Record<string, unknown> | null = null
     const compiled: Array<{ id: string; node: Record<string, unknown> }> = []
+
     for (const block of design.blocks ?? []) {
+      if (block.type === 'image' && block.hero) {
+        if (heroNode) {
+          warnings.push(
+            `บล็อก '${block.id}': การ์ดมีรูป hero ได้ใบเดียว บล็อกนี้จึงแสดงเป็นรูปปกติแทน`
+          )
+        } else {
+          const node = this.compileImage(block, ctx.placeholders, warnings)
+          if (node) {
+            heroNode = node
+            continue
+          }
+        }
+      }
+
       const node = this.compileBlock(block, theme, ctx, warnings, rowBudget)
       if (node) compiled.push({ id: block.id, node })
     }
 
-    const contents = {
+    const contents: Record<string, unknown> = {
       type: 'bubble',
       size: design.size || 'mega',
+      ...(heroNode ? { hero: heroNode } : {}),
       body: {
         type: 'box',
         layout: 'vertical',
         paddingAll: '0px',
         paddingBottom: '14px',
-        backgroundColor: theme.background,
+        ...backgroundStyle(theme.background),
         contents: compiled.map((c) => c.node),
       },
     }
@@ -206,6 +235,9 @@ export default class FlexBuilderService {
         case 'header':
           lines.push(substitute(block.title, ph))
           if (block.subtitle) lines.push(substitute(block.subtitle, ph))
+          if (block.metricValue && block.metricLabel) {
+            lines.push(`${value(block.metricValue, ph)} ${substitute(block.metricLabel, ph)}`)
+          }
           lines.push('')
           break
 
@@ -217,6 +249,7 @@ export default class FlexBuilderService {
           break
 
         case 'list':
+          if (block.heading) lines.push(substitute(block.heading, ph))
           for (const row of block.rows ?? []) {
             lines.push(`${substitute(row.label, ph)}: ${value(row.value, ph)}`)
           }
@@ -257,6 +290,12 @@ export default class FlexBuilderService {
           lines.push(`${substitute(block.label, ph)}: ${substitute(block.uri, ph)}`)
           break
 
+        case 'progress':
+          for (const row of block.rows ?? []) {
+            lines.push(`${substitute(row.label, ph)}: ${value(row.value, ph)} (${row.percent}%)`)
+          }
+          break
+
         case 'separator':
           lines.push('')
           break
@@ -292,6 +331,8 @@ export default class FlexBuilderService {
         case 'header':
           scan(block.title)
           scan(block.subtitle)
+          scan(block.metricValue)
+          scan(block.metricLabel)
           break
         case 'kpi':
           for (const cell of block.cells ?? []) {
@@ -301,6 +342,7 @@ export default class FlexBuilderService {
           }
           break
         case 'list':
+          scan(block.heading)
           for (const row of block.rows ?? []) {
             scan(row.label)
             scan(row.value)
@@ -320,12 +362,62 @@ export default class FlexBuilderService {
           scan(block.label)
           scan(block.uri)
           break
+        case 'progress':
+          for (const row of block.rows ?? []) {
+            scan(row.label)
+            scan(row.value)
+          }
+          break
         case 'separator':
           break
       }
     }
 
     return [...found]
+  }
+
+  /** ใช้ทั้งรูปในเนื้อ body และรูป hero — ต่างกันแค่ตำแหน่งที่ compileBubble เอาไปวาง */
+  private static compileImage(
+    block: ImageBlock,
+    ph: Record<string, string>,
+    warnings: string[]
+  ): Record<string, unknown> | null {
+    const url = substitute(block.url, ph).trim()
+    if (!HTTPS_URL.test(url)) {
+      warnings.push(`บล็อก '${block.id}': รูปต้องเป็น https จึงข้ามไป (ได้รับ '${url}')`)
+      return null
+    }
+    return {
+      type: 'image',
+      url,
+      size: 'full',
+      aspectRatio: block.aspectRatio || '20:13',
+      aspectMode: 'cover',
+    }
+  }
+
+  /** แบ่ง cells เป็นแถว ๆ ตามจำนวนคอลัมน์ เติมช่องว่างให้แถวสุดท้ายเต็มความกว้าง */
+  private static chunkCells<T>(cells: T[], columns: number, makeCell: (cell: T) => Record<string, unknown>) {
+    const rows: Record<string, unknown>[] = []
+    for (let i = 0; i < cells.length; i += columns) {
+      const chunk = cells.slice(i, i + columns).map(makeCell)
+      while (chunk.length < columns) {
+        chunk.push({
+          type: 'box',
+          layout: 'vertical',
+          flex: 1,
+          contents: [{ type: 'text', text: ' ', size: 'xxs' }],
+        })
+      }
+      rows.push({
+        type: 'box',
+        layout: 'horizontal',
+        spacing: 'sm',
+        ...(rows.length > 0 ? { margin: 'sm' } : {}),
+        contents: chunk,
+      })
+    }
+    return rows
   }
 
   private static compileBlock(
@@ -345,17 +437,37 @@ export default class FlexBuilderService {
             text: substitute(block.title, ph),
             weight: 'bold',
             size: 'md',
-            color: '#FFFFFF',
+            color: block.titleColor || '#FFFFFF',
             wrap: true,
           },
         ]
+        if (block.metricValue && block.metricLabel) {
+          lines.push(
+            {
+              type: 'text',
+              text: value(block.metricValue, ph),
+              size: '3xl',
+              weight: 'bold',
+              color: block.titleColor || '#FFFFFF',
+              align: 'center',
+              margin: 'sm',
+            },
+            {
+              type: 'text',
+              text: substitute(block.metricLabel, ph),
+              size: 'xxs',
+              color: block.subtitleColor || '#E2E8F0',
+              align: 'center',
+            }
+          )
+        }
         if (block.subtitle) {
           lines.push({
             type: 'text',
             text: substitute(block.subtitle, ph),
             size: 'xxs',
             // เทาอ่อนกลาง ๆ อ่านได้บนสีหลักทุกเฉด ไม่ผูกกับโทนน้ำเงิน
-            color: '#E2E8F0',
+            color: block.subtitleColor || '#E2E8F0',
             margin: 'xs',
             wrap: true,
           })
@@ -363,7 +475,7 @@ export default class FlexBuilderService {
         return {
           type: 'box',
           layout: 'vertical',
-          backgroundColor: theme.primary,
+          ...backgroundStyle(block.background ?? theme.primary),
           paddingAll: '14px',
           contents: lines,
         }
@@ -372,77 +484,106 @@ export default class FlexBuilderService {
       case 'kpi': {
         const columns = Math.min(4, Math.max(2, block.columns ?? 2))
         const cells = block.cells ?? []
-        const rows: Record<string, unknown>[] = []
+        const variant = block.variant ?? 'card'
 
-        for (let i = 0; i < cells.length; i += columns) {
-          const chunk: Record<string, unknown>[] = cells.slice(i, i + columns).map((cell) => {
-            const t = tone(cell.tone)
-            const lines: Record<string, unknown>[] = [
-              {
-                type: 'text',
-                text: substitute(cell.label, ph),
-                size: 'xxs',
-                weight: 'bold',
-                color: t.label,
-                align: 'center',
-                wrap: true,
-              },
-              {
-                type: 'text',
-                text: value(cell.value, ph),
-                size: 'xl',
-                weight: 'bold',
-                color: t.fg,
-                align: 'center',
-                margin: 'xs',
-              },
-            ]
-            if (cell.unit) {
-              lines.push({
-                type: 'text',
-                text: substitute(cell.unit, ph),
-                size: 'xxs',
-                color: '#64748B',
-                align: 'center',
-              })
-            }
-            return {
-              type: 'box',
-              layout: 'vertical',
-              backgroundColor: t.bg,
-              cornerRadius: 'lg',
-              paddingAll: '10px',
-              flex: 1,
-              contents: lines,
-            }
-          })
-
-          // เติมช่องว่างให้แถวสุดท้ายกว้างเท่าแถวอื่น
-          // กล่องต้องมี contents อย่างน้อย 1 ชิ้น Flex จึงยอมรับ
-          while (chunk.length < columns) {
-            chunk.push({
-              type: 'box',
-              layout: 'vertical',
-              flex: 1,
-              contents: [{ type: 'text', text: ' ', size: 'xxs' }],
+        const makeCard = (cell: (typeof cells)[number]) => {
+          const t = tone(cell.tone)
+          const bg = cell.bg ?? t.bg
+          const fg = cell.color ?? t.fg
+          // สีพื้นที่กำหนดเองมักหมายถึงธีมเข้ม โทนป้ายมาตรฐานอ่านไม่ออกบนพื้นเข้ม
+          // จึงใช้เทาอ่อนคงที่แทนเมื่อผู้ใช้กำหนด bg เอง
+          const labelColor = cell.bg ? '#94A3B8' : t.label
+          const lines: Record<string, unknown>[] = [
+            {
+              type: 'text',
+              text: substitute(cell.label, ph),
+              size: 'xxs',
+              weight: 'bold',
+              color: labelColor,
+              align: 'center',
+              wrap: true,
+            },
+            {
+              type: 'text',
+              text: value(cell.value, ph),
+              size: 'xl',
+              weight: 'bold',
+              color: fg,
+              align: 'center',
+              margin: 'xs',
+            },
+          ]
+          if (cell.unit) {
+            lines.push({
+              type: 'text',
+              text: substitute(cell.unit, ph),
+              size: 'xxs',
+              color: '#64748B',
+              align: 'center',
             })
           }
-
-          rows.push({
+          return {
             type: 'box',
-            layout: 'horizontal',
-            spacing: 'sm',
-            ...(rows.length > 0 ? { margin: 'sm' } : {}),
-            contents: chunk,
-          })
+            layout: 'vertical',
+            backgroundColor: bg,
+            cornerRadius: 'lg',
+            paddingAll: '10px',
+            flex: 1,
+            ...(cell.border ? { borderColor: cell.border, borderWidth: 'light' } : {}),
+            contents: lines,
+          }
         }
+
+        const makeChip = (cell: (typeof cells)[number]) => ({
+          type: 'box',
+          layout: 'vertical',
+          backgroundColor: cell.bg ?? '#FFFFFF29',
+          cornerRadius: 'xxl',
+          paddingAll: '6px',
+          flex: 1,
+          contents: [
+            {
+              type: 'text',
+              text: `${substitute(cell.label, ph)} ${value(cell.value, ph)}`,
+              size: 'xxs',
+              color: cell.color ?? '#F0FDFA',
+              align: 'center',
+            },
+          ],
+        })
+
+        const makeStat = (cell: (typeof cells)[number]) => ({
+          type: 'box',
+          layout: 'vertical',
+          flex: 1,
+          contents: [
+            {
+              type: 'text',
+              text: value(cell.value, ph),
+              size: 'lg',
+              weight: 'bold',
+              color: cell.color ?? tone(cell.tone).fg,
+              align: 'center',
+            },
+            {
+              type: 'text',
+              text: substitute(cell.label, ph),
+              size: 'xxs',
+              color: '#6B7280',
+              align: 'center',
+            },
+          ],
+        })
+
+        const makeCell = variant === 'chip' ? makeChip : variant === 'stat' ? makeStat : makeCard
+        const rows = this.chunkCells(cells, columns, makeCell)
 
         if (rows.length === 0) return null
         return { type: 'box', layout: 'vertical', ...BLOCK_PAD, contents: rows }
       }
 
       case 'list': {
-        const rows = (block.rows ?? []).map((row) => ({
+        const rowNodes = (block.rows ?? []).map((row) => ({
           type: 'box',
           layout: 'horizontal',
           paddingAll: '5px',
@@ -451,7 +592,7 @@ export default class FlexBuilderService {
               type: 'text',
               text: substitute(row.label, ph),
               size: 'xs',
-              color: '#334155',
+              color: block.labelColor || '#334155',
               flex: 3,
               wrap: true,
             },
@@ -460,15 +601,55 @@ export default class FlexBuilderService {
               text: value(row.value, ph),
               size: 'xs',
               weight: 'bold',
-              color: tone(row.tone).fg,
+              color: row.color ?? tone(row.tone).fg,
               flex: 2,
               align: 'end',
             },
           ],
         }))
 
-        if (rows.length === 0) return null
-        return { type: 'box', layout: 'vertical', ...BLOCK_PAD, contents: rows }
+        if (rowNodes.length === 0) return null
+
+        // สไตล์แถบข้าง (design แถบข้าง) — ต้องมี heading หรือ stripeColor อย่างใดอย่างหนึ่ง
+        if (block.heading || block.stripeColor) {
+          const content: Record<string, unknown>[] = []
+          if (block.heading) {
+            content.push({
+              type: 'text',
+              text: substitute(block.heading, ph),
+              size: 'xxs',
+              weight: 'bold',
+              color: '#6B7280',
+            })
+          }
+          content.push(...rowNodes)
+
+          return {
+            type: 'box',
+            layout: 'horizontal',
+            ...BLOCK_PAD,
+            contents: [
+              {
+                type: 'box',
+                layout: 'vertical',
+                width: '4px',
+                backgroundColor: block.stripeColor || theme.primary,
+                cornerRadius: '2px',
+                contents: [],
+              },
+              {
+                type: 'box',
+                layout: 'vertical',
+                flex: 1,
+                margin: 'md',
+                spacing: 'xs',
+                contents: content,
+              },
+            ],
+          }
+        }
+
+        return { type: 'box', layout: 'vertical', ...BLOCK_PAD, contents: rowNodes }
       }
 
       case 'table': {
@@ -555,6 +736,8 @@ export default class FlexBuilderService {
 
       case 'note': {
         const t = tone(block.tone)
+        const bg = block.bg ?? t.bg
+        const fg = block.color ?? t.fg
         return {
           type: 'box',
           layout: 'vertical',
@@ -563,7 +746,7 @@ export default class FlexBuilderService {
             {
               type: 'box',
               layout: 'vertical',
-              backgroundColor: t.bg,
+              backgroundColor: bg,
               cornerRadius: 'md',
               paddingAll: '10px',
               contents: [
@@ -572,7 +755,7 @@ export default class FlexBuilderService {
                   text: substitute(block.text, ph),
                   size: 'xs',
                   weight: 'bold',
-                  color: t.fg,
+                  color: fg,
                   wrap: true,
                 },
               ],
@@ -581,20 +764,8 @@ export default class FlexBuilderService {
         }
       }
 
-      case 'image': {
-        const url = substitute(block.url, ph).trim()
-        if (!HTTPS_URL.test(url)) {
-          warnings.push(`บล็อก '${block.id}': รูปต้องเป็น https จึงข้ามไป (ได้รับ '${url}')`)
-          return null
-        }
-        return {
-          type: 'image',
-          url,
-          size: 'full',
-          aspectRatio: block.aspectRatio || '20:13',
-          aspectMode: 'cover',
-        }
-      }
+      case 'image':
+        return this.compileImage(block, ph, warnings)
 
       case 'button': {
         const uri = substitute(block.uri, ph).trim()
@@ -624,13 +795,72 @@ export default class FlexBuilderService {
         }
       }
 
-      case 'separator':
+      case 'progress': {
+        const rows = (block.rows ?? []).map((row) => {
+          const pct = Math.max(0, Math.min(100, row.percent))
+          const color = row.color || '#14B8A6'
+          return {
+            type: 'box',
+            layout: 'horizontal',
+            alignItems: 'center',
+            contents: [
+              { type: 'text', text: substitute(row.label, ph), size: 'xs', color: '#374151', flex: 0 },
+              {
+                type: 'box',
+                layout: 'vertical',
+                backgroundColor: '#F0FDFA',
+                cornerRadius: '3px',
+                flex: 1,
+                margin: 'sm',
+                justifyContent: 'center',
+                contents: [
+                  {
+                    type: 'box',
+                    layout: 'vertical',
+                    height: '6px',
+                    backgroundColor: color,
+                    cornerRadius: '3px',
+                    width: `${pct}%`,
+                    contents: [],
+                  },
+                ],
+              },
+              {
+                type: 'text',
+                text: value(row.value, ph),
+                size: 'xs',
+                weight: 'bold',
+                color,
+                flex: 0,
+                margin: 'sm',
+                align: 'end',
+              },
+            ],
+          }
+        })
+
+        if (rows.length === 0) return null
+        return { type: 'box', layout: 'vertical', ...BLOCK_PAD, spacing: 'sm', contents: rows }
+      }
+
+      case 'separator': {
+        // มีสี/พื้นหลัง/ความหนากำหนดเอง = แถบตกแต่งเต็มขอบ ไม่ใช่เส้นคั่นบาง ๆ แบบเดิม
+        if (block.background || block.thickness) {
+          return {
+            type: 'box',
+            layout: 'vertical',
+            height: block.thickness || '4px',
+            ...backgroundStyle(block.background ?? block.color ?? '#E2E8F0'),
+            contents: [],
+          }
+        }
         return {
           type: 'box',
           layout: 'vertical',
           ...BLOCK_PAD,
-          contents: [{ type: 'separator', color: '#E2E8F0' }],
+          contents: [{ type: 'separator', color: block.color || '#E2E8F0' }],
         }
+      }
 
       default:
         warnings.push(`ไม่รู้จักบล็อกชนิด '${(block as FlexBlock).type}' — ข้ามไป`)

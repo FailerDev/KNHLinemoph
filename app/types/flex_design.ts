@@ -30,6 +30,9 @@ export interface HeaderBlock {
   background?: BackgroundValue
   titleColor?: FlexColor
   subtitleColor?: FlexColor
+  /** ตัวเลขเด่นขนาดใหญ่กลาง header (เช่นยอดผู้ป่วยวันนี้) ต้องมีคู่กันทั้งสองค่า */
+  metricValue?: string
+  metricLabel?: string
 }
 
 export interface KpiCell {
@@ -50,8 +53,12 @@ export interface KpiBlock {
   type: 'kpi'
   columns: 2 | 3 | 4
   cells: KpiCell[]
-  /** 'chip' = ป้ายมนบรรทัดเดียว พื้นโปร่งแสง (เหมาะกับวางบนพื้นสีเข้ม/ไล่เฉด) */
-  variant?: 'card' | 'chip'
+  /**
+   * 'card' = การ์ดสองบรรทัด (ค่าเริ่มต้น)
+   * 'chip' = ป้ายมนบรรทัดเดียว พื้นโปร่งแสง (เหมาะกับวางบนพื้นสีเข้ม/ไล่เฉด)
+   * 'stat' = ตัวเลขเปล่าไม่มีกล่อง ค่าก่อนแล้วป้ายเล็กด้านล่าง (โทนมินิมอล/นีออน)
+   */
+  variant?: 'card' | 'chip' | 'stat'
 }
 
 export interface ListRow {
@@ -69,6 +76,8 @@ export interface ListBlock {
   /** หัวข้อกลุ่มด้านบนแถบสี — ใส่คู่กับ stripeColor เพื่อเป็นสไตล์ editorial */
   heading?: string
   stripeColor?: FlexColor
+  /** สีป้าย (label) ของทุกแถวในบล็อกนี้ — ใช้เมื่อวางบนพื้นเข้มที่สีป้ายเริ่มต้นอ่านไม่ออก */
+  labelColor?: FlexColor
 }
 
 export interface TableColumn {

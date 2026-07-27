@@ -80,6 +80,10 @@ export default defineConfig({
       pattern: 'public/**',
       reloadServer: false,
     },
+    {
+      pattern: 'database/schema.sql',
+      reloadServer: false,
+    },
   ],
 
   assetsBundler: false,

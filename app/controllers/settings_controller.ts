@@ -5,6 +5,7 @@ import env from '#start/env'
 import HisDatabase from '#models/his_database'
 import SettingsService from '#services/settings_service'
 import AuditService from '#services/audit_service'
+import SchemaDriftService from '#services/schema_drift_service'
 import { settingsSaveValidator } from '#validators/settings'
 
 export default class SettingsController {
@@ -27,6 +28,8 @@ export default class SettingsController {
       /* down */
     }
 
+    const schemaDrift = isAdmin ? await SchemaDriftService.checkDrift() : null
+
     const cronToken = env.get('CRON_TOKEN') as string
     const tokenWeak = !cronToken || /change-me/i.test(cronToken)
 
@@ -45,6 +48,7 @@ export default class SettingsController {
         database: env.get('DB_DATABASE') as string,
         user: env.get('DB_USER') as string,
       },
+      schemaDrift,
       hisDbs: hisDbs.map((h) => ({
         id: h.id,
         name: h.name,

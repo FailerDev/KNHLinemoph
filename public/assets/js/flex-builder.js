@@ -93,6 +93,16 @@
       make: () => ({ id: nextId(), type: 'separator' }),
       summary: () => 'เส้นคั่น',
     },
+    progress: {
+      label: 'แถบสัดส่วน',
+      icon: 'bi-bar-chart-steps',
+      make: () => ({
+        id: nextId(),
+        type: 'progress',
+        rows: [{ label: 'รายการ A', value: '0', percent: 50 }],
+      }),
+      summary: (b) => `${(b.rows || []).length} แถบ`,
+    },
   }
 
   const state = {
@@ -308,6 +318,124 @@
     { value: '1:2', label: 'แนวตั้งสูงมาก 1:2' },
   ]
 
+  /**
+   * <input type="color"> รับได้แค่ #RRGGBB 6 หลัก ไม่รองรับความโปร่งใส 8 หลัก
+   * ที่ preset บางอันใช้ (เช่น กระจกโปร่งแสง) — ถ้าค่าปัจจุบันมี alpha จะตัด
+   * ทิ้งตอนแสดงในตัวเลือกสีนี้ครั้งแรกที่แก้ (ยอมรับเป็นข้อจำกัดที่รู้อยู่แล้ว)
+   */
+  function toPickerHex(hex) {
+    return typeof hex === 'string' && hex.length >= 7 ? hex.slice(0, 7) : '#000000'
+  }
+
+  /**
+   * แถวเลือกสีที่ "ปิดได้" — ไม่ติ๊กแปลว่าไม่ระบุ (undefined) เพื่อให้กลับไปใช้
+   * โทนสำเร็จรูปแทน ใช้ซ้ำกับทุกฟิลด์สีกำหนดเองของ kpi/list/note/header
+   */
+  function optionalColorField(labelText, currentValue, onChange, ariaLabel) {
+    const wrap = el('div', { class: 'flex-color-row' })
+    const checkboxId = `chk${uid++}`
+    const enabled = currentValue !== undefined && currentValue !== null && currentValue !== ''
+
+    const cb = el('input', { type: 'checkbox', class: 'form-check-input', id: checkboxId })
+    cb.checked = enabled
+
+    const colorInput = el('input', {
+      type: 'color',
+      class: 'form-control form-control-color form-control-sm',
+      value: toPickerHex(currentValue),
+      'aria-label': ariaLabel || labelText,
+    })
+    colorInput.disabled = !enabled
+
+    cb.addEventListener('change', () => {
+      colorInput.disabled = !cb.checked
+      onChange(cb.checked ? colorInput.value : undefined)
+    })
+    colorInput.addEventListener('input', () => {
+      if (cb.checked) onChange(colorInput.value)
+    })
+
+    wrap.appendChild(cb)
+    wrap.appendChild(el('label', { class: 'form-check-label', for: checkboxId, text: labelText }))
+    wrap.appendChild(colorInput)
+    return wrap
+  }
+
+  /**
+   * แก้พื้นหลัง: ค่าเริ่มต้น / สีทึบ / ไล่เฉดสี ใช้ซ้ำกับ theme.background,
+   * header.background, separator.background
+   */
+  function backgroundEditor(currentValue, onChange) {
+    const wrap = el('div', { class: 'flex-bg-editor' })
+    const controlsHost = el('div', { class: 'mt-1' })
+    const isGradient = currentValue !== null && typeof currentValue === 'object'
+
+    function renderControls(mode) {
+      controlsHost.innerHTML = ''
+
+      if (mode === 'solid') {
+        const color = el('input', {
+          type: 'color',
+          class: 'form-control form-control-color form-control-sm',
+          value: typeof currentValue === 'string' ? toPickerHex(currentValue) : '#1E3A8A',
+        })
+        color.addEventListener('input', () => onChange(color.value))
+        controlsHost.appendChild(color)
+        if (typeof currentValue !== 'string') onChange(color.value)
+      }
+
+      if (mode === 'gradient') {
+        const g = isGradient
+          ? currentValue
+          : { type: 'linearGradient', angle: '135deg', startColor: '#4F46E5', endColor: '#06B6D4' }
+        const row = el('div', { class: 'd-flex gap-1 align-items-center flex-wrap' })
+        const start = el('input', {
+          type: 'color', class: 'form-control form-control-color form-control-sm',
+          value: toPickerHex(g.startColor), 'aria-label': 'สีเริ่มต้น',
+        })
+        const end = el('input', {
+          type: 'color', class: 'form-control form-control-color form-control-sm',
+          value: toPickerHex(g.endColor), 'aria-label': 'สีปลายทาง',
+        })
+        const angle = el('input', {
+          type: 'number', class: 'form-control form-control-sm', style: 'width:70px',
+          value: String(parseInt(g.angle, 10) || 135), min: '0', max: '360', 'aria-label': 'องศาไล่เฉด',
+        })
+        const emit = () => onChange({
+          type: 'linearGradient', angle: `${angle.value}deg`, startColor: start.value, endColor: end.value,
+        })
+        start.addEventListener('input', emit)
+        end.addEventListener('input', emit)
+        angle.addEventListener('input', emit)
+        row.appendChild(start)
+        row.appendChild(end)
+        row.appendChild(angle)
+        row.appendChild(el('span', { class: 'flex-hint', text: 'องศา' }))
+        controlsHost.appendChild(row)
+        if (!isGradient) emit()
+      }
+    }
+
+    const initialMode = currentValue === undefined ? 'none' : isGradient ? 'gradient' : 'solid'
+    const modeSel = selectInput(
+      [
+        { value: 'none', label: 'ค่าเริ่มต้น' },
+        { value: 'solid', label: 'สีทึบ' },
+        { value: 'gradient', label: 'ไล่เฉดสี' },
+      ],
+      initialMode,
+      (mode) => {
+        if (mode === 'none') onChange(undefined)
+        renderControls(mode)
+      }
+    )
+
+    wrap.appendChild(modeSel)
+    wrap.appendChild(controlsHost)
+    renderControls(initialMode)
+    return wrap
+  }
+
   function subRowControls(list, index, rerender) {
     const box = el('div', { class: 'd-flex flex-column gap-1' })
     box.appendChild(
@@ -370,6 +498,43 @@
           maxLength: 200,
         })
       )
+
+      host.appendChild(
+        field('พื้นหลังหัวข้อ', backgroundEditor(block.background, (v) => {
+          if (v === undefined) delete block.background
+          else block.background = v
+          touch()
+        }), 'ไม่ระบุ = ใช้สีหลักของธีมด้านล่าง')
+      )
+      const colorsWrap = el('div', { class: 'flex-field' })
+      colorsWrap.appendChild(el('label', { text: 'สีตัวอักษรกำหนดเอง' }))
+      colorsWrap.appendChild(optionalColorField('สีหัวข้อ', block.titleColor, (v) => {
+        if (v === undefined) delete block.titleColor; else block.titleColor = v
+        touch()
+      }))
+      colorsWrap.appendChild(optionalColorField('สีบรรทัดรอง', block.subtitleColor, (v) => {
+        if (v === undefined) delete block.subtitleColor; else block.subtitleColor = v
+        touch()
+      }))
+      host.appendChild(colorsWrap)
+
+      const metricWrap = el('div', { class: 'flex-subrow' })
+      const metricGrid = el('div', { class: 'flex-grow-1 d-flex flex-column gap-1' })
+      metricGrid.appendChild(textInput(block.metricValue, (v) => {
+        if (v.trim() === '' && !block.metricLabel) delete block.metricValue
+        else block.metricValue = v
+        touch()
+      }, { placeholder: 'ตัวเลขใหญ่ เช่น {vn}', ariaLabel: 'ตัวเลขเด่นกลางหัวข้อ' }))
+      metricGrid.appendChild(textInput(block.metricLabel, (v) => {
+        if (v.trim() === '' && !block.metricValue) delete block.metricLabel
+        else block.metricLabel = v
+        touch()
+      }, { placeholder: 'ป้ายใต้ตัวเลข เช่น ราย (OPD)', ariaLabel: 'ป้ายใต้ตัวเลขเด่น' }))
+      metricWrap.appendChild(metricGrid)
+      host.appendChild(
+        field('ตัวเลขเด่นกลางหัวข้อ', metricWrap,
+          'ต้องกรอกทั้งสองช่องถึงจะแสดง — เว้นว่างทั้งคู่ถ้าไม่ต้องการ')
+      )
     }
 
     if (block.type === 'note') {
@@ -387,6 +552,17 @@
           touch()
         }))
       )
+      const noteColorsWrap = el('div', { class: 'flex-field' })
+      noteColorsWrap.appendChild(el('label', { text: 'สีกำหนดเอง (ทับโทนด้านบน)' }))
+      noteColorsWrap.appendChild(optionalColorField('พื้น', block.bg, (v) => {
+        if (v === undefined) delete block.bg; else block.bg = v
+        touch()
+      }))
+      noteColorsWrap.appendChild(optionalColorField('ตัวอักษร', block.color, (v) => {
+        if (v === undefined) delete block.color; else block.color = v
+        touch()
+      }))
+      host.appendChild(noteColorsWrap)
     }
 
     if (block.type === 'image') {
@@ -425,6 +601,50 @@
       host.appendChild(field('ลิงก์', textInput(block.uri, (v) => { block.uri = v; touch() })))
     }
 
+    if (block.type === 'separator') {
+      const mode = (block.background || block.thickness) ? 'thick' : 'thin'
+      host.appendChild(
+        field('รูปแบบ', selectInput([
+          { value: 'thin', label: 'เส้นบาง (ค่าเริ่มต้น)' },
+          { value: 'thick', label: 'แถบหนา / มีสีเต็มขอบ' },
+        ], mode, (v) => {
+          if (v === 'thin') {
+            delete block.background
+            delete block.thickness
+          } else if (!block.thickness) {
+            block.thickness = '4px'
+          }
+          refresh()
+        }))
+      )
+
+      if (mode === 'thin') {
+        const wrap = el('div', { class: 'flex-field' })
+        wrap.appendChild(optionalColorField('สีเส้น', block.color, (v) => {
+          if (v === undefined) delete block.color; else block.color = v
+          touch()
+        }))
+        host.appendChild(wrap)
+      } else {
+        const thicknessInput = el('input', {
+          type: 'number', class: 'form-control form-control-sm', style: 'width:90px',
+          value: String(parseInt(block.thickness, 10) || 4), min: '1', max: '30',
+          'aria-label': 'ความหนาแถบเป็นพิกเซล',
+        })
+        thicknessInput.addEventListener('input', () => {
+          block.thickness = `${Math.max(1, Number(thicknessInput.value) || 4)}px`
+          touch()
+        })
+        host.appendChild(field('ความหนา (px)', thicknessInput))
+        host.appendChild(
+          field('สี/ไล่เฉด', backgroundEditor(block.background, (v) => {
+            if (v === undefined) delete block.background; else block.background = v
+            touch()
+          }))
+        )
+      }
+    }
+
     if (block.type === 'kpi') {
       host.appendChild(
         field('จำนวนช่องต่อแถว',
@@ -434,6 +654,14 @@
             { value: 3, label: '3' },
             { value: 4, label: '4' },
           ], block.columns, (v) => { block.columns = Number(v); touch() }))
+      )
+      host.appendChild(
+        field('รูปแบบการ์ด',
+          selectInput([
+            { value: 'card', label: 'การ์ด (ค่าเริ่มต้น) — ป้ายบน ค่าใหญ่กลาง มีพื้นสี' },
+            { value: 'chip', label: 'ป้ายมน — ป้าย+ค่าบรรทัดเดียว พื้นโปร่งแสง' },
+            { value: 'stat', label: 'ตัวเลขเปล่า — ค่าใหญ่ก่อน ป้ายเล็กใต้ ไม่มีพื้นสี' },
+          ], block.variant || 'card', (v) => { block.variant = v; touch() }))
       )
       block.cells = block.cells || []
       block.cells.forEach((cell, i) => {
@@ -460,6 +688,27 @@
           touch()
         }, { ariaLabel: `โทนสีช่องที่ ${i + 1}` }))
         grid.appendChild(pair)
+
+        const details = el('details', { class: 'flex-advanced-colors' })
+        details.appendChild(el('summary', { text: 'สีกำหนดเอง (ทับโทนด้านบน)' }))
+        details.appendChild(optionalColorField('พื้นการ์ด', cell.bg, (v) => {
+          if (v === undefined) delete cell.bg; else cell.bg = v
+          touch()
+        }, `พื้นการ์ดช่องที่ ${i + 1}`))
+        details.appendChild(optionalColorField('ตัวเลข', cell.color, (v) => {
+          if (v === undefined) delete cell.color; else cell.color = v
+          touch()
+        }, `สีตัวเลขช่องที่ ${i + 1}`))
+        details.appendChild(optionalColorField('ป้าย', cell.labelColor, (v) => {
+          if (v === undefined) delete cell.labelColor; else cell.labelColor = v
+          touch()
+        }, `สีป้ายช่องที่ ${i + 1}`))
+        details.appendChild(optionalColorField('ขอบ', cell.border, (v) => {
+          if (v === undefined) delete cell.border; else cell.border = v
+          touch()
+        }, `สีขอบช่องที่ ${i + 1}`))
+        grid.appendChild(details)
+
         row.appendChild(grid)
         row.appendChild(subRowControls(block.cells, i, refresh))
         host.appendChild(row)
@@ -471,6 +720,25 @@
     }
 
     if (block.type === 'list') {
+      host.appendChild(
+        plainField('หัวข้อกลุ่ม (ไม่บังคับ)', block.heading, (v) => {
+          if (v.trim() === '') delete block.heading; else block.heading = v
+          touch()
+        }, { hint: 'ใส่คู่กับสีแถบข้างด้านล่าง เพื่อทำสไตล์แถบข้าง (editorial)' })
+      )
+      const stripeWrap = el('div', { class: 'flex-field' })
+      stripeWrap.appendChild(optionalColorField('สีแถบข้าง', block.stripeColor, (v) => {
+        if (v === undefined) delete block.stripeColor; else block.stripeColor = v
+        touch()
+      }))
+      host.appendChild(stripeWrap)
+      const labelColorWrap = el('div', { class: 'flex-field' })
+      labelColorWrap.appendChild(optionalColorField('สีป้ายทุกแถว', block.labelColor, (v) => {
+        if (v === undefined) delete block.labelColor; else block.labelColor = v
+        touch()
+      }))
+      host.appendChild(labelColorWrap)
+
       block.rows = block.rows || []
       block.rows.forEach((row, i) => {
         const wrap = el('div', { class: 'flex-subrow' })
@@ -492,12 +760,59 @@
           touch()
         }, { ariaLabel: `โทนสีแถวที่ ${i + 1}` }))
         grid.appendChild(pair)
+        grid.appendChild(optionalColorField('สีค่า (ทับโทน)', row.color, (v) => {
+          if (v === undefined) delete row.color; else row.color = v
+          touch()
+        }, `สีค่าแถวที่ ${i + 1}`))
         wrap.appendChild(grid)
         wrap.appendChild(subRowControls(block.rows, i, refresh))
         host.appendChild(wrap)
       })
       host.appendChild(addButton('เพิ่มแถว', () => {
         block.rows.push({ label: 'รายการใหม่', value: '0' })
+        refresh()
+      }))
+    }
+
+    if (block.type === 'progress') {
+      block.rows = block.rows || []
+      block.rows.forEach((row, i) => {
+        const wrap = el('div', { class: 'flex-subrow' })
+        const grid = el('div', { class: 'flex-grow-1 d-flex flex-column gap-1' })
+        grid.appendChild(textInput(row.label, (v) => { row.label = v; touch() }, { placeholder: 'ป้าย', ariaLabel: `ป้ายแถบที่ ${i + 1}` }))
+        const valueRow = el('div', { class: 'd-flex gap-1' })
+        const valueInput = textInput(row.value, (v) => { row.value = v; touch() }, { placeholder: 'ค่าที่แสดง เช่น 93%', ariaLabel: `ค่าแถบที่ ${i + 1}` })
+        valueRow.appendChild(valueInput)
+        valueRow.appendChild(variablePicker((key) => {
+          row.value = `{${key}}`
+          valueInput.value = row.value
+          touch()
+        }, `แทรกตัวแปรในค่าแถบที่ ${i + 1}`))
+        grid.appendChild(valueRow)
+        const pair = el('div', { class: 'd-flex gap-1 align-items-center' })
+        pair.appendChild(el('span', { class: 'flex-hint', text: 'ความยาวแถบ' }))
+        pair.appendChild(el('input', {
+          type: 'number', class: 'form-control form-control-sm', style: 'width:70px',
+          value: String(row.percent ?? 50), min: '0', max: '100', 'aria-label': `เปอร์เซ็นต์แถบที่ ${i + 1}`,
+          oninput: null,
+        }))
+        const percentInput = pair.lastChild
+        percentInput.addEventListener('input', () => {
+          row.percent = Math.max(0, Math.min(100, Number(percentInput.value) || 0))
+          touch()
+        })
+        pair.appendChild(el('span', { class: 'flex-hint', text: '%' }))
+        grid.appendChild(pair)
+        grid.appendChild(optionalColorField('สีแถบ', row.color, (v) => {
+          if (v === undefined) delete row.color; else row.color = v
+          touch()
+        }, `สีแถบที่ ${i + 1}`))
+        wrap.appendChild(grid)
+        wrap.appendChild(subRowControls(block.rows, i, refresh))
+        host.appendChild(wrap)
+      })
+      host.appendChild(addButton('เพิ่มแถบ', () => {
+        block.rows.push({ label: 'รายการใหม่', value: '0', percent: 50 })
         refresh()
       }))
     }
@@ -721,6 +1036,21 @@
     })
   }
 
+  /** วาดตัวแก้ไขพื้นหลังทั้งการ์ด (theme.background) — เรียกทุกครั้งที่โหลดดีไซน์ใหม่ */
+  function renderThemeBackground() {
+    const host = $('flexThemeBackgroundWrap')
+    if (!host) return
+    host.innerHTML = ''
+    host.appendChild(
+      backgroundEditor(state.design.theme?.background, (v) => {
+        state.design.theme = state.design.theme || {}
+        if (v === undefined) delete state.design.theme.background
+        else state.design.theme.background = v
+        schedulePreview()
+      })
+    )
+  }
+
   // ---------- แกลเลอรีดีไซน์สำเร็จรูป ----------
 
   function renderPresetList() {
@@ -784,6 +1114,7 @@
     if (altInput) altInput.value = state.altText
     const themeInput = $('flexThemePrimary')
     if (themeInput) themeInput.value = state.design.theme?.primary || '#1E3A8A'
+    renderThemeBackground()
 
     renderList()
     renderProps()
@@ -883,6 +1214,7 @@
       if (altInput) altInput.value = state.altText
       const themeInput = $('flexThemePrimary')
       if (themeInput) themeInput.value = state.design.theme?.primary || '#1E3A8A'
+      renderThemeBackground()
 
       renderList()
       renderProps()

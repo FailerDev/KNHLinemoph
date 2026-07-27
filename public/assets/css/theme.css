@@ -1171,6 +1171,17 @@ a:hover { color: var(--brand-700); }
 .flex-len-counter        { text-align: right; }
 .flex-len-warn           { color: var(--danger); font-weight: 600; }
 
+.flex-color-row          { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; font-size: 12px; color: var(--text-muted); }
+.flex-color-row label    { flex: 1; margin: 0; cursor: pointer; }
+.flex-color-row input[type="color"] { width: 40px; height: 26px; padding: 2px; flex-shrink: 0; }
+.flex-color-row input[type="color"]:disabled { opacity: .35; cursor: not-allowed; }
+
+.flex-bg-editor input[type="color"] { width: 40px; height: 26px; padding: 2px; }
+
+.flex-advanced-colors    { margin-top: 6px; border: 1px solid var(--border-soft); border-radius: 6px; padding: 4px 8px; }
+.flex-advanced-colors summary { font-size: 11px; color: var(--text-soft); cursor: pointer; padding: 3px 0; -webkit-user-select: none; user-select: none; }
+.flex-advanced-colors[open] summary { color: var(--text-muted); margin-bottom: 4px; }
+
 .flex-preset-bar         { margin-bottom: 8px; }
 .flex-preset-panel       { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated); margin-bottom: 10px; overflow: hidden; }
 .flex-preset-panel-head  { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }

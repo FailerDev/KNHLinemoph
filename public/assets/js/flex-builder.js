@@ -219,6 +219,43 @@
     return sel
   }
 
+  /**
+   * ฟิลด์ข้อความที่มีตัวเลือกแทรกตัวแปรอยู่ข้าง ๆ ให้
+   * ใช้กับหัวข้อ/บรรทัดรอง/ข้อความเตือน/ปุ่ม ที่มักอ้างตัวแปรอย่าง {org_name}
+   */
+  function textFieldWithPicker(labelText, value, onInput, opts = {}) {
+    const wrap = el('div', { class: 'flex-field' })
+    const inputId = `fld${uid++}`
+    wrap.appendChild(el('label', { for: inputId, text: labelText }))
+
+    const row = el('div', { class: 'd-flex gap-1' })
+    const input = textInput(value, onInput, { placeholder: opts.placeholder })
+    input.id = inputId
+    row.appendChild(input)
+    row.appendChild(
+      variablePicker((key) => {
+        input.value = `${input.value}{${key}}`
+        onInput(input.value)
+      }, opts.pickerLabel || `แทรกตัวแปรใน ${labelText}`)
+    )
+    wrap.appendChild(row)
+
+    if (opts.hint) wrap.appendChild(el('div', { class: 'flex-hint', text: opts.hint }))
+    return wrap
+  }
+
+  /** ค่าที่ LINE Flex Message รองรับสำหรับ aspectRatio ของบล็อกรูปภาพ */
+  const ASPECT_RATIOS = [
+    { value: '20:13', label: 'แนวนอนกว้าง 20:13 (ค่าเริ่มต้น)' },
+    { value: '1:1', label: 'จัตุรัส 1:1' },
+    { value: '16:9', label: 'แนวนอนจอกว้าง 16:9' },
+    { value: '4:3', label: 'แนวนอนมาตรฐาน 4:3' },
+    { value: '2:1', label: 'พาโนรามา 2:1' },
+    { value: '3:4', label: 'แนวตั้ง 3:4' },
+    { value: '9:16', label: 'แนวตั้งสูง 9:16' },
+    { value: '1:2', label: 'แนวตั้งสูงมาก 1:2' },
+  ]
+
   function subRowControls(list, index, rerender) {
     const box = el('div', { class: 'd-flex flex-column gap-1' })
     box.appendChild(
@@ -269,15 +306,25 @@
     )
 
     if (block.type === 'header') {
-      host.appendChild(field('หัวข้อ', textInput(block.title, (v) => { block.title = v; touch() })))
       host.appendChild(
-        field('บรรทัดรอง', textInput(block.subtitle, (v) => { block.subtitle = v; touch() }),
-          'ใช้ {org_name} {date_th} ได้')
+        textFieldWithPicker('หัวข้อ', block.title, (v) => { block.title = v; touch() }, {
+          pickerLabel: 'แทรกตัวแปรในหัวข้อ',
+        })
+      )
+      host.appendChild(
+        textFieldWithPicker('บรรทัดรอง', block.subtitle, (v) => { block.subtitle = v; touch() }, {
+          pickerLabel: 'แทรกตัวแปรในบรรทัดรอง',
+          hint: 'เลือกตัวแปรจากช่องขวา หรือพิมพ์เอง เช่น {org_name}',
+        })
       )
     }
 
     if (block.type === 'note') {
-      host.appendChild(field('ข้อความ', textInput(block.text, (v) => { block.text = v; touch() })))
+      host.appendChild(
+        textFieldWithPicker('ข้อความ', block.text, (v) => { block.text = v; touch() }, {
+          pickerLabel: 'แทรกตัวแปรในข้อความ',
+        })
+      )
       host.appendChild(
         field('โทนสี', selectInput(TONES, block.tone || 'muted', (v) => { block.tone = v; touch() }))
       )
@@ -289,13 +336,18 @@
           'ต้องเป็น https และเปิดสาธารณะ LINE จึงจะโหลดได้')
       )
       host.appendChild(
-        field('สัดส่วน', textInput(block.aspectRatio, (v) => { block.aspectRatio = v; touch() }), 'เช่น 20:13')
+        field('สัดส่วนรูป',
+          selectInput(ASPECT_RATIOS, block.aspectRatio || '20:13', (v) => { block.aspectRatio = v; touch() }),
+          'อัตราส่วน กว้าง:สูง ของกรอบรูป — ดูผลจริงได้จากตัวอย่างด้านขวา')
       )
     }
 
     if (block.type === 'button') {
       host.appendChild(
-        field('ข้อความบนปุ่ม', textInput(block.label, (v) => { block.label = v; touch() }), 'สูงสุด 40 ตัวอักษร')
+        textFieldWithPicker('ข้อความบนปุ่ม', block.label, (v) => { block.label = v; touch() }, {
+          pickerLabel: 'แทรกตัวแปรในข้อความบนปุ่ม',
+          hint: 'สูงสุด 40 ตัวอักษร',
+        })
       )
       host.appendChild(field('ลิงก์', textInput(block.uri, (v) => { block.uri = v; touch() })))
     }

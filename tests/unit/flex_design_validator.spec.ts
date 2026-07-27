@@ -103,6 +103,23 @@ test.group('parseFlexDesign', () => {
     assert.equal((parsed.blocks[0] as any).columns.length, 2)
   })
 
+  test('รับ aspectRatio ที่ LINE รองรับ', async ({ assert }) => {
+    const good = {
+      version: 1,
+      blocks: [{ id: 'i', type: 'image', url: 'https://example.com/a.png', aspectRatio: '16:9' }],
+    }
+    const parsed = await parseFlexDesign(JSON.stringify(good))
+    assert.equal((parsed.blocks[0] as any).aspectRatio, '16:9')
+  })
+
+  test('ปฏิเสธ aspectRatio ที่ LINE ไม่รองรับ', async ({ assert }) => {
+    const bad = {
+      version: 1,
+      blocks: [{ id: 'i', type: 'image', url: 'https://example.com/a.png', aspectRatio: '5:5' }],
+    }
+    await assert.rejects(() => parseFlexDesign(JSON.stringify(bad)))
+  })
+
   test('ปฏิเสธการ์ดที่มีบล็อกเกิน 30 ชิ้น', async ({ assert }) => {
     const bad = {
       version: 1,

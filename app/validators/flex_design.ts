@@ -4,6 +4,11 @@ import type { FlexDesign } from '#types/flex_design'
 const TONES = ['info', 'ok', 'warn', 'danger', 'muted'] as const
 const ALIGNS = ['start', 'center', 'end'] as const
 const SIZES = ['nano', 'micro', 'kilo', 'mega', 'giga'] as const
+// ค่าที่ LINE Flex Message รองรับจริงสำหรับ aspectRatio ของ image component
+// อ้างอิงเอกสาร LINE — ผิดไปจากนี้ LINE จะปฏิเสธข้อความทั้งใบตอนส่งจริง
+const ASPECT_RATIOS = [
+  '1:1', '1.51:1', '1.91:1', '4:3', '16:9', '20:13', '2:1', '3:1', '3:4', '9:16', '1:2', '1:3',
+] as const
 const HEX = /^#[0-9a-fA-F]{6}$/
 
 const blockId = vine.string().trim().minLength(1).maxLength(40)
@@ -80,7 +85,7 @@ const imageBlock = vine.object({
   id: blockId,
   type: vine.literal('image'),
   url: vine.string().trim().url().maxLength(500),
-  aspectRatio: vine.string().trim().maxLength(10).optional(),
+  aspectRatio: vine.enum(ASPECT_RATIOS).optional(),
 })
 
 const buttonBlock = vine.object({

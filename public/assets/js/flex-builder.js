@@ -204,24 +204,72 @@
    */
   function variablePicker(onPick, ariaLabel) {
     const vars = availableVariables()
-    const sel = el('select', {
-      class: 'form-select form-select-sm flex-var-picker',
-      'aria-label': ariaLabel || 'แทรกตัวแปร',
-      title: 'แทรกตัวแปรจากรายการข้อมูล',
+    const listId = `flexVars${uid++}`
+
+    // datalist ให้เบราว์เซอร์กรองตัวเลือกแบบเรียลไทม์ตามที่พิมพ์ — ไม่ต้องเขียน
+    // ตัวกรองเอง ทำงานเหมือนกันทุก field ที่ใช้ variablePicker นี้
+    const datalist = el('datalist', { id: listId })
+    vars.forEach((v) => datalist.appendChild(el('option', { value: `${v.label} {${v.key}}` })))
+
+    const wrap = el('div', { class: 'flex-var-picker' })
+    const input = el('input', {
+      type: 'text',
+      class: 'form-control form-control-sm',
+      list: listId,
+      autocomplete: 'off',
+      placeholder: vars.length ? 'ค้นหาตัวแปร…' : '(ยังไม่มีรายการข้อมูล)',
+      'aria-label': ariaLabel || 'ค้นหาและแทรกตัวแปร',
+      title: 'พิมพ์เพื่อค้นหา แล้วเลือกตัวแปรจากรายการ',
     })
-    sel.appendChild(el('option', { value: '', text: vars.length ? 'แทรกตัวแปร…' : '(ยังไม่มีรายการข้อมูล)' }))
-    vars.forEach((v) => sel.appendChild(el('option', { value: v.key, text: `${v.label} {${v.key}}` })))
-    sel.addEventListener('change', () => {
-      if (!sel.value) return
-      onPick(sel.value)
-      sel.value = ''
+
+    // ค่าที่พิมพ์/เลือกลงท้ายด้วย {key} ที่มีอยู่จริง = ผู้ใช้เลือกแล้ว ให้แทรกทันที
+    input.addEventListener('input', () => {
+      const m = input.value.match(/\{([a-zA-Z0-9_]+)\}\s*$/)
+      if (!m || !vars.some((v) => v.key === m[1])) return
+      onPick(m[1])
+      input.value = ''
     })
-    return sel
+
+    wrap.appendChild(input)
+    wrap.appendChild(datalist)
+    return wrap
+  }
+
+  /**
+   * เพิ่มตัวนับความยาวใต้ input พร้อมเตือนเมื่อใกล้ขีดจำกัด
+   * ตั้ง maxLength จริงบน input ด้วย จึงพิมพ์/วางเกินไม่ได้ตั้งแต่ต้น
+   * ไม่ใช่แค่เตือนหลังบันทึกแล้วเจอ error ภาษาอังกฤษจาก validator
+   */
+  function attachLengthCounter(wrap, input, maxLength) {
+    if (!maxLength) return
+    input.maxLength = maxLength
+    const counter = el('div', { class: 'flex-hint flex-len-counter' })
+    const update = () => {
+      const len = input.value.length
+      counter.textContent = `${len}/${maxLength} ตัวอักษร`
+      counter.classList.toggle('flex-len-warn', len >= maxLength * 0.9)
+    }
+    input.addEventListener('input', update)
+    update()
+    wrap.appendChild(counter)
+  }
+
+  /** ฟิลด์ข้อความธรรมดา ไม่มีตัวช่วยแทรกตัวแปร ใช้กับหัวข้อหลักที่ควรเป็นข้อความคงที่ */
+  function plainField(labelText, value, onInput, opts = {}) {
+    const wrap = el('div', { class: 'flex-field' })
+    const inputId = `fld${uid++}`
+    wrap.appendChild(el('label', { for: inputId, text: labelText }))
+    const input = textInput(value, onInput, { placeholder: opts.placeholder, ariaLabel: labelText })
+    input.id = inputId
+    wrap.appendChild(input)
+    attachLengthCounter(wrap, input, opts.maxLength)
+    if (opts.hint) wrap.appendChild(el('div', { class: 'flex-hint', text: opts.hint }))
+    return wrap
   }
 
   /**
    * ฟิลด์ข้อความที่มีตัวเลือกแทรกตัวแปรอยู่ข้าง ๆ ให้
-   * ใช้กับหัวข้อ/บรรทัดรอง/ข้อความเตือน/ปุ่ม ที่มักอ้างตัวแปรอย่าง {org_name}
+   * ใช้กับบรรทัดรอง/ข้อความเตือน/ปุ่ม ที่มักอ้างตัวแปรอย่าง {org_name}
    */
   function textFieldWithPicker(labelText, value, onInput, opts = {}) {
     const wrap = el('div', { class: 'flex-field' })
@@ -240,6 +288,7 @@
     )
     wrap.appendChild(row)
 
+    attachLengthCounter(wrap, input, opts.maxLength)
     if (opts.hint) wrap.appendChild(el('div', { class: 'flex-hint', text: opts.hint }))
     return wrap
   }
@@ -306,15 +355,16 @@
     )
 
     if (block.type === 'header') {
+      // หัวข้อหลักเป็นข้อความคงที่โดยตั้งใจ ไม่มีตัวช่วยแทรกตัวแปร —
+      // ตัวแปรอย่างวันที่/ชื่อ รพ. ใส่ในบรรทัดรองพอ
       host.appendChild(
-        textFieldWithPicker('หัวข้อ', block.title, (v) => { block.title = v; touch() }, {
-          pickerLabel: 'แทรกตัวแปรในหัวข้อ',
-        })
+        plainField('หัวข้อ', block.title, (v) => { block.title = v; touch() }, { maxLength: 200 })
       )
       host.appendChild(
         textFieldWithPicker('บรรทัดรอง', block.subtitle, (v) => { block.subtitle = v; touch() }, {
           pickerLabel: 'แทรกตัวแปรในบรรทัดรอง',
           hint: 'เลือกตัวแปรจากช่องขวา หรือพิมพ์เอง เช่น {org_name}',
+          maxLength: 200,
         })
       )
     }

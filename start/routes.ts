@@ -14,6 +14,7 @@ const UsersController = () => import('#controllers/users_controller')
 const SettingsController = () => import('#controllers/settings_controller')
 const HisDatabasesController = () => import('#controllers/his_databases_controller')
 const CronController = () => import('#controllers/cron_controller')
+const CdcuController = () => import('#controllers/cdcu_controller')
 
 /*
 |--------------------------------------------------------------------------
@@ -87,6 +88,12 @@ router
 
     router.post('/templates/save', [TemplatesController, 'save']).as('templates.save')
     router.post('/templates/delete', [TemplatesController, 'delete']).as('templates.delete')
+    router
+      .post('/templates/flex/preview', [TemplatesController, 'flexPreview'])
+      .as('templates.flexPreview')
+    router
+      .post('/templates/flex/test-send', [TemplatesController, 'flexTestSend'])
+      .as('templates.flexTestSend')
 
     router.get('/items', [ItemsController, 'index']).as('items.index')
     router.post('/items/save', [ItemsController, 'save']).as('items.save')
@@ -103,6 +110,15 @@ router
     router.post('/cron/status', [CronController, 'status']).as('cron.status')
     router.post('/cron/log', [CronController, 'log']).as('cron.log')
     router.post('/cron/run', [CronController, 'run']).as('cron.run')
+
+    router.get('/cdcu', [CdcuController, 'index']).as('cdcu.index')
+    router.post('/cdcu/get', [CdcuController, 'get']).as('cdcu.get')
+    router.post('/cdcu/save', [CdcuController, 'save']).as('cdcu.save')
+    router.post('/cdcu/delete', [CdcuController, 'delete']).as('cdcu.delete')
+    router.post('/cdcu/toggle', [CdcuController, 'toggle']).as('cdcu.toggle')
+    router.post('/cdcu/logs', [CdcuController, 'logs']).as('cdcu.logs')
+    router.post('/cdcu/run', [CdcuController, 'run']).as('cdcu.run')
+    router.post('/cdcu/clear-logs', [CdcuController, 'clearLogs']).as('cdcu.clearLogs')
   })
   .use([middleware.auth(), middleware.role(['operator'])])
 

@@ -102,6 +102,19 @@ test.group('FlexBuilderService.build — โครงและบล็อกพ
 })
 
 test.group('FlexBuilderService.build — kpi, list, image, button', () => {
+  test('kpi columns:1 ให้ช่องเดียวเต็มความกว้าง ไม่เติมช่องว่างข้าง ๆ', ({ assert }) => {
+    // เจอจริงตอนทดสอบส่ง: HN ที่มีหลายหลักพับบรรทัดเมื่อถูกบีบให้แชร์แถวกับช่องอื่น
+    // columns:1 คือทางแก้ — ต้องไม่ถูกดันขึ้น min 2 เหมือนเดิม
+    const d = design([
+      { id: 'k', type: 'kpi', columns: 1, cells: [{ label: 'HN', value: '00025631' }] },
+    ])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+    const row = bubble.body.contents[0].contents[0]
+
+    assert.lengthOf(row.contents, 1)
+    assert.equal(row.contents[0].contents[1].text, '00025631')
+  })
+
   test('kpi จัดเป็นแถวละ columns ช่อง', ({ assert }) => {
     const d = design([
       {

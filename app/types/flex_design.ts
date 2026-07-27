@@ -57,7 +57,8 @@ export interface KpiCell {
 export interface KpiBlock {
   id: string
   type: 'kpi'
-  columns: 2 | 3 | 4
+  /** 1 = ช่องเดียวเต็มความกว้างการ์ด เหมาะกับค่าที่อาจยาว (เช่น HN) ที่ห้ามตัด/พับบรรทัด */
+  columns: 1 | 2 | 3 | 4
   cells: KpiCell[]
   /**
    * 'card' = การ์ดสองบรรทัด (ค่าเริ่มต้น)

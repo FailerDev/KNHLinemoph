@@ -428,8 +428,12 @@
     if (block.type === 'kpi') {
       host.appendChild(
         field('จำนวนช่องต่อแถว',
-          selectInput([{ value: 2, label: '2' }, { value: 3, label: '3' }, { value: 4, label: '4' }],
-            block.columns, (v) => { block.columns = Number(v); touch() }))
+          selectInput([
+            { value: 1, label: '1 (เต็มความกว้าง — เหมาะกับค่าที่อาจยาว เช่น HN)' },
+            { value: 2, label: '2' },
+            { value: 3, label: '3' },
+            { value: 4, label: '4' },
+          ], block.columns, (v) => { block.columns = Number(v); touch() }))
       )
       block.cells = block.cells || []
       block.cells.forEach((cell, i) => {

@@ -482,7 +482,7 @@ export default class FlexBuilderService {
       }
 
       case 'kpi': {
-        const columns = Math.min(4, Math.max(2, block.columns ?? 2))
+        const columns = Math.min(4, Math.max(1, block.columns ?? 2))
         const cells = block.cells ?? []
         const variant = block.variant ?? 'card'
 

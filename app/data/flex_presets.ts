@@ -526,11 +526,18 @@ export const CDCU_FLEX_PRESET: FlexPreset = {
         subtitle: '{org_name} • {vstdate_th} {vsttime}',
       },
       {
-        id: 'k',
+        id: 'k1',
         type: 'kpi',
-        columns: 3,
+        // เต็มความกว้างการ์ดโดยตั้งใจ — HN บางที่มีหลายหลัก ถ้าแบ่งคอลัมน์จะพับ
+        // บรรทัดดูไม่เรียบร้อย (เจอจริงตอนทดสอบส่ง)
+        columns: 1,
+        cells: [{ label: 'HN', value: '{hn}', tone: 'muted' }],
+      },
+      {
+        id: 'k2',
+        type: 'kpi',
+        columns: 2,
         cells: [
-          { label: 'HN', value: '{hn}', tone: 'muted' },
           { label: 'ICD-10', value: '{icd10}', tone: 'danger' },
           { label: 'อายุ', value: '{age}', unit: 'ปี', tone: 'info' },
         ],

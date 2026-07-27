@@ -76,7 +76,7 @@ const headerBlock = vine.object({
 const kpiBlock = vine.object({
   id: blockId,
   type: vine.literal('kpi'),
-  columns: vine.number().min(2).max(4),
+  columns: vine.number().min(1).max(4),
   variant: vine.enum(['card', 'chip', 'stat']).optional(),
   cells: vine
     .array(

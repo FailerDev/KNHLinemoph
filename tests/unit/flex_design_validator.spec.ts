@@ -213,6 +213,23 @@ test.group('parseFlexDesign', () => {
     await assert.rejects(() => parseFlexDesign(JSON.stringify(bad)))
   })
 
+  test('รับ kpi columns:1 (ช่องเดียวเต็มความกว้าง)', async ({ assert }) => {
+    const good = {
+      version: 1,
+      blocks: [{ id: 'k', type: 'kpi', columns: 1, cells: [{ label: 'HN', value: '{hn}' }] }],
+    }
+    const parsed = await parseFlexDesign(JSON.stringify(good))
+    assert.equal((parsed.blocks[0] as any).columns, 1)
+  })
+
+  test('ปฏิเสธ kpi columns:0', async ({ assert }) => {
+    const bad = {
+      version: 1,
+      blocks: [{ id: 'k', type: 'kpi', columns: 0, cells: [{ label: 'x', value: 'x' }] }],
+    }
+    await assert.rejects(() => parseFlexDesign(JSON.stringify(bad)))
+  })
+
   test('รับ kpi cell ที่กำหนดสีเอง (bg/color/border)', async ({ assert }) => {
     const good = {
       version: 1,

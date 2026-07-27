@@ -490,9 +490,10 @@ export default class FlexBuilderService {
           const t = tone(cell.tone)
           const bg = cell.bg ?? t.bg
           const fg = cell.color ?? t.fg
-          // สีพื้นที่กำหนดเองมักหมายถึงธีมเข้ม โทนป้ายมาตรฐานอ่านไม่ออกบนพื้นเข้ม
-          // จึงใช้เทาอ่อนคงที่แทนเมื่อผู้ใช้กำหนด bg เอง
-          const labelColor = cell.bg ? '#94A3B8' : t.label
+          // ถ้าไม่ระบุ labelColor เอง และมี bg กำหนดเอง ให้เดาว่าเป็นธีมเข้มแล้ว
+          // ใช้เทาอ่อนคงที่ — แต่ถ้า bg ที่กำหนดเป็นโทนอ่อน (เช่นพาสเทล) ต้องระบุ
+          // labelColor เองเสมอ ไม่งั้นได้เทาอ่อนบนพื้นอ่อนซึ่งอ่านไม่ออก
+          const labelColor = cell.labelColor ?? (cell.bg ? '#94A3B8' : t.label)
           const lines: Record<string, unknown>[] = [
             {
               type: 'text',

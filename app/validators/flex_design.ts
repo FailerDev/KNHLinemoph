@@ -86,6 +86,7 @@ const kpiBlock = vine.object({
         unit: vine.string().trim().maxLength(20).optional(),
         tone: toneField,
         color: hexOptional('สีตัวเลขของช่อง KPI'),
+        labelColor: hexOptional('สีป้ายของช่อง KPI'),
         bg: hexOptional('สีพื้นของช่อง KPI'),
         border: hexOptional('สีขอบของช่อง KPI'),
       })

@@ -10,20 +10,33 @@
 (function () {
   'use strict'
 
-  const SIZE_PX = { xxs: 11, xs: 13, sm: 14, md: 16, lg: 19, xl: 22, xxl: 27 }
+  const SIZE_PX = { xxs: 11, xs: 13, sm: 14, md: 16, lg: 19, xl: 22, xxl: 27, '3xl': 34 }
   const SPACING_PX = { none: 0, xs: 2, sm: 4, md: 8, lg: 12, xl: 16, xxl: 20 }
   const RADIUS_PX = { none: 0, xs: 2, sm: 4, md: 6, lg: 8, xl: 12, xxl: 16 }
 
   const isPx = (v) => typeof v === 'string' && /^\d+px$/.test(v)
+  // LINE ใช้ px/% ตรงกับหน่วย CSS อยู่แล้ว ไม่ต้องแปลงค่า
+  const isCssLength = (v) => typeof v === 'string' && /^\d+(\.\d+)?(px|%)$/.test(v)
+
+  /** สีทึบ (backgroundColor) หรือไล่เฉดสี (background: {type:'linearGradient',...}) */
+  function applyBackground(s, node) {
+    if (node.background && node.background.type === 'linearGradient') {
+      const g = node.background
+      s.background = `linear-gradient(${g.angle}, ${g.startColor}, ${g.endColor})`
+    } else if (node.backgroundColor) {
+      s.background = node.backgroundColor
+    }
+  }
 
   function applyBoxStyle(el, node) {
     const s = el.style
     s.display = 'flex'
     s.flexDirection = node.layout === 'horizontal' ? 'row' : 'column'
-    if (node.layout === 'horizontal') {
-      s.alignItems = node.alignItems === 'center' ? 'center' : 'stretch'
-    }
-    if (node.backgroundColor) s.background = node.backgroundColor
+    if (node.alignItems === 'center') s.alignItems = 'center'
+    else if (node.layout === 'horizontal') s.alignItems = 'stretch'
+    if (node.justifyContent === 'center') s.justifyContent = 'center'
+    applyBackground(s, node)
+    if (node.borderColor) s.border = `1px solid ${node.borderColor}`
     if (node.cornerRadius) s.borderRadius = (RADIUS_PX[node.cornerRadius] ?? 6) + 'px'
     if (isPx(node.paddingAll)) s.padding = node.paddingAll
     if (isPx(node.paddingTop)) s.paddingTop = node.paddingTop
@@ -33,6 +46,8 @@
     if (node.spacing) s.gap = (SPACING_PX[node.spacing] ?? 4) + 'px'
     if (node.flex !== undefined) s.flex = String(node.flex)
     if (node.margin) s.marginTop = (SPACING_PX[node.margin] ?? 0) + 'px'
+    if (isCssLength(node.width)) { s.width = node.width; s.flexShrink = '0' }
+    if (isCssLength(node.height)) { s.height = node.height; s.flexShrink = '0' }
     s.minWidth = '0'
   }
 
@@ -122,6 +137,8 @@
 
       const card = document.createElement('div')
       card.className = 'flex-preview-bubble'
+      // hero เป็นรูปเต็มขอบด้านบนสุด อยู่นอก body คนละ property กันโดยสเปกของ LINE
+      if (bubble.hero) card.appendChild(renderNode(bubble.hero))
       if (bubble.body) card.appendChild(renderNode(bubble.body))
       target.appendChild(card)
       return (bubble.body?.contents || []).length

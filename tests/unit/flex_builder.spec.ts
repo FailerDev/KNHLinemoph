@@ -741,6 +741,33 @@ test.group('FlexBuilderService.build — สีกำหนดเองบน kp
     assert.equal(cell.contents[0].color, '#94A3B8')
   })
 
+  test('kpi cell bg สีอ่อน (พาสเทล) ต้องใช้ labelColor ที่ระบุเอง ไม่ใช่เทาอ่อนที่เดาไว้', ({ assert }) => {
+    // บั๊กที่เจอจริงตอนสร้าง preset พาสเทล: ถ้าเดา labelColor จาก bg เสมอ
+    // จะได้ป้ายสีเทาอ่อนบนพื้นสีอ่อน (#EDE9FE) อ่านไม่ออก ต้องให้ระบุเองได้
+    const d = design([
+      {
+        id: 'k',
+        type: 'kpi',
+        columns: 2,
+        cells: [{ label: 'OPD', value: '10', bg: '#EDE9FE', color: '#7C3AED', labelColor: '#6D28D9' }],
+      },
+    ])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+    const cell = bubble.body.contents[0].contents[0].contents[0]
+
+    assert.equal(cell.contents[0].color, '#6D28D9')
+  })
+
+  test('kpi cell bg โดยไม่ระบุ labelColor ยังเดาเป็นเทาอ่อนเหมือนเดิม (ธีมเข้ม)', ({ assert }) => {
+    const d = design([
+      { id: 'k', type: 'kpi', columns: 2, cells: [{ label: 'OPD', value: '10', bg: '#1E293B' }] },
+    ])
+    const bubble = FlexBuilderService.build(d, 'alt', emptyCtx).contents as any
+    const cell = bubble.body.contents[0].contents[0].contents[0]
+
+    assert.equal(cell.contents[0].color, '#94A3B8')
+  })
+
   test('kpi variant chip รวมป้าย+ค่าในบรรทัดเดียว พื้นโปร่งแสง', ({ assert }) => {
     const d = design([
       {

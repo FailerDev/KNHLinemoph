@@ -2,23 +2,30 @@
   @slot('main')
     <div class="card-modern mb-4">
       <div class="card-modern-header">
-        <h2><i class="bi bi-file-earmark-text text-brand"></i> เทมเพลตข้อความ <span class="text-muted-soft">({{ templates.length }})</span></h2>
+        <h2><i class="bi bi-file-earmark-text text-brand" aria-hidden="true"></i> เทมเพลตข้อความ <span class="text-muted-soft">({{ templates.length }})</span></h2>
         <button class="btn-modern btn-brand" onclick="Templates.openNew()">
-          <i class="bi bi-plus-lg"></i> เพิ่มเทมเพลต
+          <i class="bi bi-plus-lg" aria-hidden="true"></i> เพิ่มเทมเพลต
         </button>
       </div>
       <div class="card-modern-body" style="padding:0;">
         @if(templates.length === 0)
           <div class="empty-state">
-            <i class="bi bi-file-earmark-plus"></i>
+            <i class="bi bi-file-earmark-plus" aria-hidden="true"></i>
             <h4>ยังไม่มีเทมเพลต</h4>
           </div>
         @else
+          <div style="padding:10px 16px;border-bottom:1px solid var(--border);">
+            <div class="input-group input-group-sm" style="max-width:320px;">
+              <span class="input-group-text" style="background:var(--bg-muted);border-color:var(--border);"><i class="bi bi-search text-muted-soft" aria-hidden="true"></i></span>
+              <input type="text" class="form-control" id="tplSearch" placeholder="ค้นหาเทมเพลต..." oninput="Templates.filter(this.value)" style="border-color:var(--border);" aria-label="ค้นหาเทมเพลต">
+            </div>
+          </div>
           <div class="table-responsive">
             <table class="table-modern">
               <thead>
                 <tr>
                   <th>ชื่อ</th>
+                  <th>ประเภท</th>
                   <th>ตัวแปร</th>
                   <th>ตัวอย่าง</th>
                   <th>สถานะ</th>
@@ -29,6 +36,13 @@
                 @each(t in templates)
                   <tr data-tpl-id="{{ t.id }}">
                     <td><strong>{{ t.name }}</strong></td>
+                    <td>
+                      @if(t.message_type === 'flex')
+                        <span class="badge-modern badge-info"><i class="bi bi-card-heading" aria-hidden="true"></i> Flex</span>
+                      @else
+                        <span class="badge-modern badge-neutral">ข้อความ</span>
+                      @end
+                    </td>
                     <td>
                       <div class="chip-list">
                         @each(v in t.variables.slice(0, 6))
@@ -48,11 +62,11 @@
                       @end
                     </td>
                     <td class="text-end">
-                      <button class="btn-modern btn-soft btn-sm btn-icon" onclick='Templates.openEdit({{{ JSON.stringify(t) }}})' title="แก้ไข">
-                        <i class="bi bi-pencil"></i>
+                      <button class="btn-modern btn-soft btn-sm btn-icon" onclick='Templates.openEdit({{{ JSON.stringify(t) }}})' title="แก้ไข" aria-label="แก้ไข {{ t.name }}">
+                        <i class="bi bi-pencil" aria-hidden="true"></i>
                       </button>
-                      <button class="btn-modern btn-danger-soft btn-sm btn-icon" onclick="Templates.remove({{ t.id }})" title="ลบ">
-                        <i class="bi bi-trash"></i>
+                      <button class="btn-modern btn-danger-soft btn-sm btn-icon" onclick="Templates.remove({{ t.id }})" title="ลบ" aria-label="ลบ {{ t.name }}">
+                        <i class="bi bi-trash" aria-hidden="true"></i>
                       </button>
                     </td>
                   </tr>
@@ -64,51 +78,75 @@
       </div>
     </div>
 
-    <div class="modal fade" id="templateModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal fade" id="templateModal" tabindex="-1" aria-hidden="true" aria-labelledby="templateModalTitle">
+      <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content">
           <form id="templateForm" class="form-modern" novalidate>
             <input type="hidden" name="id">
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
 
             <div class="modal-header">
-              <h5 class="modal-title" id="templateModalTitle"><i class="bi bi-file-earmark-text text-brand"></i> เพิ่มเทมเพลต</h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              <h5 class="modal-title" id="templateModalTitle"><i class="bi bi-file-earmark-text text-brand" aria-hidden="true"></i> เพิ่มเทมเพลต</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
             </div>
 
             <div class="modal-body">
-              <div class="mb-3">
-                <label class="form-label">ชื่อเทมเพลต *</label>
-                <input type="text" class="form-control" name="template_name" required maxlength="100">
+              <div class="row g-3 mb-3">
+                <div class="col-md-7">
+                  <label class="form-label" for="templateNameInput">ชื่อเทมเพลต *</label>
+                  <input type="text" class="form-control" id="templateNameInput" name="template_name" required maxlength="100">
+                </div>
+                <div class="col-md-5">
+                  <span class="form-label d-block">ประเภทข้อความ</span>
+                  <div class="btn-group w-100" role="group" aria-label="ประเภทข้อความ">
+                    <input type="radio" class="btn-check" name="message_type" id="msgTypeText" value="text" checked
+                           onchange="Templates.setMode('text')">
+                    <label class="btn btn-outline-secondary btn-sm" for="msgTypeText">
+                      <i class="bi bi-body-text" aria-hidden="true"></i> ข้อความธรรมดา
+                    </label>
+
+                    <input type="radio" class="btn-check" name="message_type" id="msgTypeFlex" value="flex"
+                           onchange="Templates.setMode('flex')">
+                    <label class="btn btn-outline-secondary btn-sm" for="msgTypeFlex">
+                      <i class="bi bi-card-heading" aria-hidden="true"></i> การ์ด Flex
+                    </label>
+                  </div>
+                </div>
               </div>
 
-              <div class="row g-3">
+              <div id="flexModeWrap" hidden>
+                @include('partials/flex_builder')
+              </div>
+
+              <div class="row g-3" id="textModeWrap">
                 <div class="col-md-7">
                   <label class="form-label">เนื้อหา *</label>
                   <textarea class="form-control" name="template_content" rows="10" required
                             oninput="Templates.updatePreview()" id="templateContent"></textarea>
 
                   <div class="placeholder-ref mt-2">
-                    <div class="placeholder-ref-header" onclick="this.parentElement.classList.toggle('is-open')">
-                      <i class="bi bi-braces"></i> ตัวแปรที่ใช้ได้
-                      <i class="bi bi-chevron-down placeholder-ref-chevron"></i>
+                    <div class="placeholder-ref-header" role="button" tabindex="0" aria-expanded="false"
+                         onclick="const p=this.parentElement.classList.toggle('is-open'); this.setAttribute('aria-expanded', p)"
+                         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); const p=this.parentElement.classList.toggle('is-open'); this.setAttribute('aria-expanded', p)}">
+                      <i class="bi bi-braces" aria-hidden="true"></i> ตัวแปรที่ใช้ได้
+                      <i class="bi bi-chevron-down placeholder-ref-chevron" aria-hidden="true"></i>
                     </div>
                     <div class="placeholder-ref-body">
                       <div class="placeholder-ref-group">
                         <span class="placeholder-ref-label">วันที่ / เวลา</span>
                         <div class="chip-list">
-                          <span class="chip chip-insert" data-insert="date" title="วันที่ปัจจุบัน เช่น 2026-06-01">&#123;date&#125;</span>
-                          <span class="chip chip-insert" data-insert="time" title="เวลาปัจจุบัน เช่น 08:30:00">&#123;time&#125;</span>
-                          <span class="chip chip-insert" data-insert="date_th" title="วันที่ภาษาไทย เช่น 1 มิถุนายน 2569">&#123;date_th&#125;</span>
-                          <span class="chip chip-insert" data-insert="weekday" title="วันในสัปดาห์ เช่น วันจันทร์">&#123;weekday&#125;</span>
+                          <span class="chip chip-insert" data-insert="date" role="button" tabindex="0" title="วันที่ปัจจุบัน เช่น 2026-06-01">&#123;date&#125;</span>
+                          <span class="chip chip-insert" data-insert="time" role="button" tabindex="0" title="เวลาปัจจุบัน เช่น 08:30:00">&#123;time&#125;</span>
+                          <span class="chip chip-insert" data-insert="date_th" role="button" tabindex="0" title="วันที่ภาษาไทย เช่น 1 มิถุนายน 2569">&#123;date_th&#125;</span>
+                          <span class="chip chip-insert" data-insert="weekday" role="button" tabindex="0" title="วันในสัปดาห์ เช่น วันจันทร์">&#123;weekday&#125;</span>
                         </div>
                       </div>
                       <div class="placeholder-ref-group">
                         <span class="placeholder-ref-label">ข้อมูลระบบ</span>
                         <div class="chip-list">
-                          <span class="chip chip-insert" data-insert="org_name" title="ชื่อโรงพยาบาล (Settings)">&#123;org_name&#125;</span>
-                          <span class="chip chip-insert" data-insert="site_title" title="ชื่อระบบ (Settings)">&#123;site_title&#125;</span>
-                          <span class="chip chip-insert" data-insert="site_footer" title="Footer (Settings)">&#123;site_footer&#125;</span>
+                          <span class="chip chip-insert" data-insert="org_name" role="button" tabindex="0" title="ชื่อโรงพยาบาล (Settings)">&#123;org_name&#125;</span>
+                          <span class="chip chip-insert" data-insert="site_title" role="button" tabindex="0" title="ชื่อระบบ (Settings)">&#123;site_title&#125;</span>
+                          <span class="chip chip-insert" data-insert="site_footer" role="button" tabindex="0" title="Footer (Settings)">&#123;site_footer&#125;</span>
                         </div>
                       </div>
                       @if(itemVars.length > 0)
@@ -116,7 +154,7 @@
                           <span class="placeholder-ref-label">รายการข้อมูล (Items)</span>
                           <div class="chip-list">
                             @each(iv in itemVars)
-                              <span class="chip chip-insert" data-insert="{{ iv.key }}" title="{{ iv.name }}">&#123;{{ iv.key }}&#125;</span>
+                              <span class="chip chip-insert" data-insert="{{ iv.key }}" role="button" tabindex="0" title="{{ iv.name }}">&#123;{{ iv.key }}&#125;</span>
                             @end
                           </div>
                         </div>
@@ -148,7 +186,7 @@
 
             <div class="modal-footer">
               <button type="button" class="btn-modern btn-soft" data-bs-dismiss="modal">ยกเลิก</button>
-              <button type="submit" class="btn-modern btn-brand"><i class="bi bi-check-lg"></i> บันทึก</button>
+              <button type="submit" class="btn-modern btn-brand"><i class="bi bi-check-lg" aria-hidden="true"></i> บันทึก</button>
             </div>
           </form>
         </div>
@@ -172,6 +210,14 @@
       .chip-insert:hover { background: var(--brand); color: #fff; }
     </style>
     <script>
+      window.FLEX_BUILDER_DATA = {
+        itemVars: {{{ JSON.stringify(itemVars) }}},
+        lineGroups: {{{ JSON.stringify(lineGroups) }}},
+      };
+    </script>
+    <script src="/assets/js/flex-preview.js"></script>
+    <script src="/assets/js/flex-builder.js"></script>
+    <script>
       (function () {
         const knownVars = {{{ JSON.stringify(knownVars) }}};
         const now = new Date();
@@ -190,15 +236,16 @@
 
         const Templates = {
           modal: null,
+          pendingDesign: null,
+          pendingAltText: '',
+          flexOpened: false,
           init() {
             this.modal = new bootstrap.Modal(document.getElementById('templateModal'));
             document.getElementById('templateForm').addEventListener('submit', e => {
               e.preventDefault();
               this.save();
             });
-            document.getElementById('templateModal').addEventListener('click', e => {
-              const chip = e.target.closest('.chip-insert');
-              if (!chip) return;
+            const insertChip = (chip) => {
               const ta = document.getElementById('templateContent');
               const ins = `{${chip.dataset.insert}}`;
               const s = ta.selectionStart, en = ta.selectionEnd;
@@ -206,6 +253,18 @@
               ta.selectionStart = ta.selectionEnd = s + ins.length;
               ta.focus();
               this.updatePreview();
+            };
+            const modalEl = document.getElementById('templateModal');
+            modalEl.addEventListener('click', e => {
+              const chip = e.target.closest('.chip-insert');
+              if (chip) insertChip(chip);
+            });
+            modalEl.addEventListener('keydown', e => {
+              if (e.key !== 'Enter' && e.key !== ' ') return;
+              const chip = e.target.closest('.chip-insert');
+              if (!chip) return;
+              e.preventDefault();
+              insertChip(chip);
             });
           },
           updatePreview() {
@@ -228,11 +287,29 @@
               status.innerHTML = '<span style="color:var(--success);">✓ ตัวแปรทั้งหมดถูกต้อง (' + used.size + ' ตัว)</span>';
             }
           },
+          /** สลับระหว่างโหมดข้อความธรรมดากับ block builder */
+          setMode(mode) {
+            const isFlex = mode === 'flex';
+            document.getElementById('textModeWrap').hidden = isFlex;
+            document.getElementById('flexModeWrap').hidden = !isFlex;
+            // textarea เป็น required ในโหมด text เท่านั้น ไม่งั้นโหมด flex จะ submit ไม่ผ่าน
+            document.getElementById('templateContent').required = !isFlex;
+            document.getElementById('msgTypeFlex').checked = isFlex;
+            document.getElementById('msgTypeText').checked = !isFlex;
+            if (isFlex && !this.flexOpened) {
+              FlexBuilder.open(this.pendingDesign, this.pendingAltText);
+              this.flexOpened = true;
+            }
+          },
           openNew() {
             const f = document.getElementById('templateForm');
             f.reset();
             f.id.value = '';
             f.is_active.checked = true;
+            this.pendingDesign = null;
+            this.pendingAltText = '';
+            this.flexOpened = false;
+            this.setMode('text');
             document.getElementById('templateModalTitle').textContent = 'เพิ่มเทมเพลต';
             this.updatePreview();
             this.modal.show();
@@ -243,18 +320,37 @@
             f.template_name.value = t.name;
             f.template_content.value = t.content;
             f.is_active.checked = !!t.is_active;
+            this.pendingDesign = t.flex_design || null;
+            this.pendingAltText = t.alt_text || '';
+            this.flexOpened = false;
+            this.setMode(t.message_type === 'flex' ? 'flex' : 'text');
             document.getElementById('templateModalTitle').textContent = 'แก้ไขเทมเพลต';
             this.updatePreview();
             this.modal.show();
           },
           async save() {
             const fd = new FormData(document.getElementById('templateForm'));
+            if (document.getElementById('msgTypeFlex').checked) {
+              const design = FlexBuilder.getDesign();
+              if (!design || !design.blocks || design.blocks.length === 0) {
+                App.error('บันทึกไม่ได้', 'การ์ด Flex ต้องมีอย่างน้อย 1 บล็อก');
+                return;
+              }
+              fd.set('flex_design', JSON.stringify(design));
+              fd.set('alt_text', FlexBuilder.getAltText());
+            }
             const res = await App.ajax('/templates/save', fd);
             if (res.success) {
               App.success('สำเร็จ', res.message);
               this.modal.hide();
               setTimeout(() => location.reload(), 500);
             }
+          },
+          filter(q) {
+            const s = q.trim().toLowerCase()
+            document.querySelectorAll('.table-modern tbody tr').forEach(tr => {
+              tr.style.display = !s || tr.textContent.toLowerCase().includes(s) ? '' : 'none'
+            })
           },
           async remove(id) {
             const ok = await App.confirm({ title: 'ลบเทมเพลต?', text: 'ไม่สามารถย้อนกลับได้', confirmText: 'ลบ', danger: true });

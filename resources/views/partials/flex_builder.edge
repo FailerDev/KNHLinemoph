@@ -1,0 +1,96 @@
+{{--
+  Block builder ของการ์ด Flex
+
+  markup อย่างเดียว สถานะทั้งหมดอยู่ใน public/assets/js/flex-builder.js
+  ต้องมี window.FLEX_BUILDER_DATA ตั้งค่าไว้ก่อน (ดู templates.edge)
+--}}
+<div class="flex-builder" id="flexBuilder">
+
+  {{-- คอลัมน์ซ้าย: รายการบล็อก --}}
+  <div class="flex-builder-col">
+    <div class="flex-builder-col-head">
+      <i class="bi bi-stack" aria-hidden="true"></i> โครงสร้างการ์ด
+    </div>
+    <div style="padding:8px 8px 0;">
+      <label class="visually-hidden" for="flexAddBlock">เพิ่มบล็อก</label>
+      <select class="form-select form-select-sm" id="flexAddBlock">
+        <option value="">+ เพิ่มบล็อก…</option>
+        <option value="header">หัวข้อ</option>
+        <option value="kpi">การ์ดตัวเลข</option>
+        <option value="list">รายการคู่</option>
+        <option value="table">ตาราง</option>
+        <option value="note">ข้อความเตือน</option>
+        <option value="image">รูปภาพ</option>
+        <option value="button">ปุ่มลิงก์</option>
+        <option value="separator">เส้นคั่น</option>
+      </select>
+    </div>
+    <ul class="flex-block-list" id="flexBlockList" role="listbox"
+        aria-label="บล็อกในการ์ด เรียงจากบนลงล่าง"></ul>
+    <div class="flex-hint" style="padding:0 10px 10px;">
+      ลูกศรขึ้น/ลง = เลือกบล็อก · Alt + ลูกศรซ้าย/ขวา = สลับตำแหน่ง
+    </div>
+  </div>
+
+  {{-- คอลัมน์กลาง: คุณสมบัติของบล็อกที่เลือก --}}
+  <div class="flex-builder-col">
+    <div class="flex-builder-col-head">
+      <i class="bi bi-sliders" aria-hidden="true"></i> คุณสมบัติ
+    </div>
+    <div class="flex-builder-body" id="flexBlockProps"></div>
+  </div>
+
+  {{-- คอลัมน์ขวา: ตัวอย่าง --}}
+  <div class="flex-builder-col">
+    <div class="flex-builder-col-head">
+      <i class="bi bi-phone" aria-hidden="true"></i> ตัวอย่าง
+    </div>
+    <div class="flex-builder-body">
+      <div class="flex-preview-wrap">
+        <div id="flexPreviewTarget"></div>
+      </div>
+      <div class="flex-preview-meta" id="flexPreviewMeta"></div>
+      <div id="flexPreviewMsg"></div>
+
+      <button type="button" class="btn-modern btn-soft btn-sm w-100 mt-2" id="flexLiveBtn">
+        <i class="bi bi-database" aria-hidden="true"></i> ดูด้วยข้อมูลจริง
+      </button>
+      <div class="flex-hint">ตัวอย่างใช้ข้อมูลจำลอง กดปุ่มนี้เพื่อดึงจาก HIS หนึ่งครั้ง</div>
+
+      @if(lineGroups.length > 0)
+        <hr style="margin:12px 0;">
+        <label class="form-label" for="flexTestGroup" style="font-size:12px;">ส่งทดสอบเข้าห้องจริง</label>
+        <select class="form-select form-select-sm mb-1" id="flexTestGroup">
+          <option value="">— เลือกกลุ่ม LINE —</option>
+          @each(g in lineGroups)
+            <option value="{{ g.id }}">{{ g.name }}</option>
+          @end
+        </select>
+        <button type="button" class="btn-modern btn-soft btn-sm w-100" id="flexTestSendBtn">
+          <i class="bi bi-send" aria-hidden="true"></i> ส่งทดสอบ
+        </button>
+        <div class="flex-hint">API ตอบสำเร็จไม่ได้แปลว่าเข้าห้องจริง — เปิดแอป LINE ตรวจด้วยตาทุกครั้ง</div>
+      @else
+        <hr style="margin:12px 0;">
+        <div class="flex-hint">ยังไม่มีกลุ่ม LINE ที่เปิดใช้งาน — <a href="/groups">เพิ่มที่นี่</a> จึงจะส่งทดสอบได้</div>
+      @end
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mt-1">
+  <div class="col-md-8">
+    <label class="form-label" for="flexAltText">ข้อความย่อ (altText) *</label>
+    <input type="text" class="form-control" id="flexAltText" maxlength="400"
+           placeholder="เช่น สรุปผู้มารับบริการ {date_th}">
+    <div class="form-text" style="font-size:11px;">
+      ข้อความที่แสดงในรายการแชทและการแจ้งเตือนของ LINE ก่อนเปิดดูการ์ด
+    </div>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label" for="flexThemePrimary">สีหลักของการ์ด</label>
+    <input type="color" class="form-control form-control-color" id="flexThemePrimary" value="#1E3A8A">
+  </div>
+</div>
+
+<div class="visually-hidden" id="flexAnnounce" role="status" aria-live="polite"></div>

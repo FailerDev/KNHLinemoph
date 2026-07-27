@@ -26,7 +26,7 @@
     /* --- Text --- */
     --text:         #1a2332;
     --text-muted:   #5a6b80;
-    --text-soft:    #8896a8;
+    --text-soft:    #64748b; /* ≥4.5:1 on light bg (was #8896a8 ≈ 3.0:1, failed WCAG AA) */
     --text-invert:  #ffffff;
 
     /* --- Status --- */
@@ -34,6 +34,8 @@
     --warning: #f59e0b;
     --danger:  #dc2626;
     --info:    #0ea5e9;
+    --weekend:      #c2410c; /* weekend-day accent (orange) */
+    --weekend-soft: rgba(194, 65, 12, 0.6);
 
     /* --- Sidebar --- */
     --sidebar-bg:        linear-gradient(180deg, #00a853 0%, #008235 100%);
@@ -70,6 +72,8 @@
     --text:       #e2e8f0;
     --text-muted: #94a3b8;
     --text-soft:  #64748b;
+    --weekend:      #fb923c; /* lighter orange so weekend chips stay legible on dark */
+    --weekend-soft: rgba(251, 146, 60, 0.65);
 
     --sidebar-bg:        linear-gradient(180deg, #052e16 0%, #022c0e 100%);
     --sidebar-active-bg: rgba(6,199,85,0.22);
@@ -394,6 +398,13 @@ a:hover { color: var(--brand-700); }
 .btn-modern.btn-icon    { width: 38px; height: 38px; padding: 0; justify-content: center; gap: 0; }
 .btn-modern.btn-icon.btn-sm { width: 32px; height: 32px; padding: 0; }
 
+/* Touch devices: grow icon buttons to a comfortable target (WCAG 2.5.5).
+   Desktop (fine pointer) keeps the compact 32/38px sizing above. */
+@media (pointer: coarse) {
+    .btn-modern.btn-icon    { width: 44px; height: 44px; }
+    .btn-modern.btn-icon.btn-sm { width: 40px; height: 40px; }
+}
+
 /* Action group wrapper for table cells / button rows */
 .action-buttons {
     display: inline-flex;
@@ -580,8 +591,8 @@ a:hover { color: var(--brand-700); }
     transition: all var(--t-base);
 }
 
-.day-chip.is-weekend { color: #c2410c; }
-.day-chip.is-weekend .day-chip-sub { color: rgba(194, 65, 12, 0.6); }
+.day-chip.is-weekend { color: var(--weekend); }
+.day-chip.is-weekend .day-chip-sub { color: var(--weekend-soft); }
 
 .day-chip:hover {
     border-color: var(--brand-300);
@@ -1128,4 +1139,51 @@ a:hover { color: var(--brand-700); }
         font-size: 13px;
         padding: 9px 8px;
     }
+}
+
+/* ============================================================
+   Flex block builder  (หน้า /templates โหมด Flex)
+   ============================================================ */
+.flex-builder            { display: grid; grid-template-columns: 200px 1fr 290px; gap: 12px; align-items: start; }
+.flex-builder-col        { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated); overflow: hidden; }
+.flex-builder-col-head   { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+.flex-builder-col-head .btn-modern { margin-left: auto; }
+.flex-builder-body       { padding: 10px; max-height: 460px; overflow-y: auto; }
+
+.flex-block-list         { list-style: none; margin: 0; padding: 6px; display: flex; flex-direction: column; gap: 4px; max-height: 420px; overflow-y: auto; }
+.flex-block-item         { display: flex; align-items: center; gap: 4px; padding: 7px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); cursor: pointer; font-size: 13px; color: var(--text); }
+.flex-block-item:hover   { border-color: var(--brand-500); }
+.flex-block-item[aria-selected="true"] { border-color: var(--brand-500); background: var(--bg-muted); font-weight: 600; }
+.flex-block-item:focus-visible { outline: 2px solid var(--brand-600); outline-offset: 2px; }
+.flex-block-label        { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flex-block-move         { border: 0; background: transparent; color: var(--text-soft); padding: 3px 5px; line-height: 1; border-radius: 4px; cursor: pointer; }
+.flex-block-move:hover:not(:disabled) { color: var(--text); background: var(--bg-muted); }
+.flex-block-move:disabled{ opacity: .3; cursor: default; }
+.flex-block-empty        { color: var(--text-soft); font-size: 12px; text-align: center; padding: 20px 8px; }
+
+.flex-field              { margin-bottom: 10px; }
+.flex-field > label      { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 3px; }
+.flex-subrow             { display: flex; gap: 6px; align-items: flex-start; margin-bottom: 6px; padding: 8px; border: 1px solid var(--border-soft); border-radius: 8px; background: var(--bg); }
+.flex-subrow > *         { min-width: 0; }
+.flex-hint               { font-size: 11px; color: var(--text-soft); margin-top: 3px; }
+
+.flex-preview-wrap       { background: #8CABD8; padding: 14px; border-radius: var(--radius); }
+.flex-preview-bubble     { background: #fff; border-radius: 12px; overflow: hidden; font-family: Sarabun, sans-serif; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+.flex-preview-btn        { color: #fff; text-align: center; padding: 8px; border-radius: 6px; font-size: 13px; font-weight: 600; }
+.flex-preview-empty      { color: #334155; background: #fff; border-radius: 12px; font-size: 13px; text-align: center; padding: 28px 8px; }
+.flex-preview-imgfail    { background: #FEF2F2; color: #B91C1C; font-size: 11px; padding: 10px; text-align: center; }
+.flex-preview-meta       { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--text-soft); margin-top: 8px; }
+.flex-preview-warn       { background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; font-size: 11px; padding: 8px 10px; border-radius: 8px; margin-top: 8px; }
+.flex-preview-err        { background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; font-size: 11px; padding: 8px 10px; border-radius: 8px; margin-top: 8px; }
+
+[data-bs-theme="dark"] .flex-preview-wrap  { background: #24405e; }
+[data-bs-theme="dark"] .flex-preview-warn  { background: #422006; border-color: #713f12; color: #fcd34d; }
+[data-bs-theme="dark"] .flex-preview-err   { background: #450a0a; border-color: #7f1d1d; color: #fca5a5; }
+
+@media (max-width: 991px) {
+    .flex-builder { grid-template-columns: 1fr; }
+    .flex-block-list, .flex-builder-body { max-height: 300px; }
+}
+@media (pointer: coarse) {
+    .flex-block-move { min-width: 34px; min-height: 34px; }
 }

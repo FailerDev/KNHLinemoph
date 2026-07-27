@@ -187,6 +187,21 @@
                     @end
                   </tbody>
                 </table>
+
+                @if(schemaDrift.alterSql)
+                  <div class="d-flex justify-content-between align-items-center mt-3 mb-1">
+                    <label class="form-label mb-0" for="schemaDriftSql">SQL แนะนำ (ตรวจทวนก่อนรันเองเสมอ — ระบบไม่รันให้อัตโนมัติ)</label>
+                    <button type="button" class="btn-modern btn-soft btn-sm" id="schemaDriftCopyBtn">
+                      <i class="bi bi-clipboard" aria-hidden="true"></i> คัดลอก
+                    </button>
+                  </div>
+                  <textarea class="form-control" id="schemaDriftSql" readonly rows="6"
+                            style="font-family:monospace; font-size:12px;">{{ schemaDrift.alterSql }}</textarea>
+                  <div class="flex-hint mt-1">
+                    เฉพาะคอลัมน์ที่ "ขาดใน DB" เท่านั้นที่ได้คำสั่ง ADD COLUMN ให้ตรง ๆ — คอลัมน์ที่ "เกินใน DB" ได้แค่คอมเมนต์เตือน
+                    เพราะการ DROP COLUMN เสี่ยงข้อมูลหายถาวร ต้องตรวจสอบเองก่อนเสมอ
+                  </div>
+                @end
               @end
             </div>
           @end
@@ -469,6 +484,18 @@
           const pad = n => String(n).padStart(2, '0');
           el.textContent = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
         }, 1000);
+
+        // Copy generated ALTER SQL (schema drift check)
+        document.getElementById('schemaDriftCopyBtn')?.addEventListener('click', async () => {
+          const ta = document.getElementById('schemaDriftSql');
+          try {
+            await navigator.clipboard.writeText(ta.value);
+            App.success('คัดลอกแล้ว', 'วางไปตรวจทวนก่อนรันเองใน DB');
+          } catch {
+            ta.select();
+            App.error('คัดลอกอัตโนมัติไม่ได้', 'เลือกข้อความไว้ให้แล้ว กด Ctrl+C เอง');
+          }
+        });
 
         // HIS DB management (admin)
         const hisModalEl = document.getElementById('hisModal');

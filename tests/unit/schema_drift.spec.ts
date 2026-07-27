@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { test } from '@japa/runner'
-import { parseSchemaTables } from '#services/schema_drift_service'
+import SchemaDriftService, {
+  parseSchemaTables,
+  parseSchemaColumnDefinitions,
+} from '#services/schema_drift_service'
 
 test.group('parseSchemaTables — แยกคอลัมน์จาก CREATE TABLE', () => {
   test('แยกชื่อคอลัมน์พื้นฐานได้ถูกต้อง', ({ assert }) => {
@@ -77,5 +80,94 @@ CREATE TABLE \`cdcu_watch_groups\` (
 
     assert.isDefined(tables.notification_items)
     assert.include(tables.notification_items, 'result_mode')
+  })
+})
+
+test.group('parseSchemaColumnDefinitions — แยกนิยามคอลัมน์เต็มสำหรับสร้าง ALTER SQL', () => {
+  test('เก็บ type/NULL/DEFAULT ต่อคอลัมน์ ตัดคอมม่าท้ายบรรทัดออก', ({ assert }) => {
+    const sql = `
+CREATE TABLE \`widgets\` (
+  \`id\`         INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  \`message_type\` ENUM('text','flex') NOT NULL DEFAULT 'text',
+  \`flex_design\`  JSON NULL COMMENT 'block definition used when message_type=flex',
+  PRIMARY KEY (\`id\`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+`
+    const defs = parseSchemaColumnDefinitions(sql)
+    assert.equal(defs.widgets.id, 'INT UNSIGNED  NOT NULL AUTO_INCREMENT')
+    assert.equal(defs.widgets.message_type, "ENUM('text','flex') NOT NULL DEFAULT 'text'")
+    assert.equal(
+      defs.widgets.flex_design,
+      "JSON NULL COMMENT 'block definition used when message_type=flex'"
+    )
+  })
+})
+
+test.group('SchemaDriftService.generateAlterSql — SQL แนะนำสำหรับ copy ไปรันเอง', () => {
+  const schemaSql = `
+CREATE TABLE \`notification_templates\` (
+  \`id\`               INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  \`template_name\`    VARCHAR(200)  NOT NULL,
+  \`message_type\`     ENUM('text','flex') NOT NULL DEFAULT 'text',
+  \`flex_design\`      JSON          NULL     COMMENT 'block definition used when message_type=flex',
+  PRIMARY KEY (\`id\`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+`
+
+  test('คอลัมน์ที่ขาดใน DB ได้ ALTER ... ADD COLUMN ตรงกับ schema.sql', ({ assert }) => {
+    const sql = SchemaDriftService.generateAlterSql(
+      [
+        {
+          table: 'notification_templates',
+          missingInDb: ['message_type', 'flex_design'],
+          extraInDb: [],
+          tableMissing: false,
+        },
+      ],
+      schemaSql
+    )
+    assert.include(
+      sql,
+      "ALTER TABLE `notification_templates` ADD COLUMN `message_type` ENUM('text','flex') NOT NULL DEFAULT 'text';"
+    )
+    assert.include(
+      sql,
+      "ALTER TABLE `notification_templates` ADD COLUMN `flex_design` JSON          NULL     COMMENT 'block definition used when message_type=flex';"
+    )
+  })
+
+  test('คอลัมน์ที่เกินใน DB ได้แค่คอมเมนต์เตือน ไม่มีคำสั่ง DROP COLUMN ที่รันได้จริง', ({
+    assert,
+  }) => {
+    const sql = SchemaDriftService.generateAlterSql(
+      [
+        {
+          table: 'notification_templates',
+          missingInDb: [],
+          extraInDb: ['legacy_column'],
+          tableMissing: false,
+        },
+      ],
+      schemaSql
+    )
+    const executableLines = sql
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('--'))
+    assert.isEmpty(executableLines.filter((l) => l.length > 0))
+    assert.include(sql, 'legacy_column')
+  })
+
+  test('ตารางที่ยังไม่มีใน DB ได้แค่คอมเมนต์ให้ไปดู schema.sql เอง ไม่สร้างคำสั่ง CREATE TABLE ที่รันได้จริง', ({
+    assert,
+  }) => {
+    const sql = SchemaDriftService.generateAlterSql(
+      [{ table: 'brand_new_table', missingInDb: ['id'], extraInDb: [], tableMissing: true }],
+      schemaSql
+    )
+    const executableLines = sql
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('--'))
+    assert.isEmpty(executableLines.filter((l) => l.length > 0))
+    assert.include(sql, 'brand_new_table')
   })
 })

@@ -19,6 +19,8 @@ export interface DriftResult {
   reason?: string
   hasDrift: boolean
   tables: TableDrift[]
+  /** SQL แนะนำให้ตรวจสอบแล้วรันเอง — ไม่มีการรันอัตโนมัติจากระบบ */
+  alterSql?: string
   checkedAt: string
 }
 
@@ -51,6 +53,33 @@ export function parseSchemaTables(sql: string): Record<string, string[]> {
 }
 
 /**
+ * แยกนิยามคอลัมน์เต็ม (type/NULL/DEFAULT/COMMENT บนบรรทัดเดียวกัน) จาก
+ * CREATE TABLE แต่ละก้อน — ใช้สร้างคำสั่ง ALTER TABLE ADD COLUMN ให้ตรงกับ
+ * schema.sql เป๊ะ ๆ โดยไม่ต้องพิมพ์ type เอง
+ *
+ * บรรทัดต่อของ COMMENT ที่ล้นบรรทัด (เช่น result_mode) จะไม่ถูกรวมเข้ามา —
+ * ยอมรับได้เพราะ COMMENT เป็นแค่ส่วนอธิบาย ไม่กระทบความถูกต้องของ ALTER
+ */
+export function parseSchemaColumnDefinitions(sql: string): Record<string, Record<string, string>> {
+  const tables: Record<string, Record<string, string>> = {}
+  const tableRe = /CREATE TABLE `(\w+)` \(\n([\s\S]*?)\n\) ENGINE=/g
+  const colDefRe = /^\s*`([a-zA-Z0-9_]+)`\s+([A-Za-z][^\n]*?),?\s*$/gm
+
+  let tableMatch: RegExpExecArray | null
+  while ((tableMatch = tableRe.exec(sql))) {
+    const [, tableName, body] = tableMatch
+    const columns: Record<string, string> = {}
+    let colMatch: RegExpExecArray | null
+    colDefRe.lastIndex = 0
+    while ((colMatch = colDefRe.exec(body))) {
+      columns[colMatch[1]] = colMatch[2].trim()
+    }
+    tables[tableName] = columns
+  }
+  return tables
+}
+
+/**
  * SchemaDriftService — เทียบ database/schema.sql (สิ่งที่โค้ดคาดหวัง) กับ
  * โครงสร้างจริงของ APP database ที่เชื่อมต่ออยู่ (สิ่งที่มีอยู่จริง)
  *
@@ -62,6 +91,48 @@ export function parseSchemaTables(sql: string): Record<string, string[]> {
 export default class SchemaDriftService {
   private static schemaPath(): string {
     return path.join(process.cwd(), 'database', 'schema.sql')
+  }
+
+  /**
+   * สร้าง SQL แนะนำจากส่วนต่างที่เจอ — ให้แอดมินอ่านทวนแล้ว copy ไปรันเอง
+   * ไม่มีขั้นตอนไหนใน service นี้ที่รัน SQL ใส่ DB จริงเลย
+   *
+   * เฉพาะคอลัมน์ที่ "ขาดใน DB" เท่านั้นที่ได้ ALTER ... ADD COLUMN ให้ตรง ๆ
+   * ส่วนคอลัมน์ที่ "เกินใน DB" ได้แค่คอมเมนต์เตือน — ไม่แนะนำ DROP COLUMN
+   * อัตโนมัติเพราะเสี่ยงข้อมูลผู้ป่วยหายถาวรถ้า schema.sql ไม่ทันสมัยจริง ๆ
+   */
+  static generateAlterSql(tables: TableDrift[], schemaSql: string): string {
+    const definitions = parseSchemaColumnDefinitions(schemaSql)
+    const lines: string[] = []
+
+    for (const t of tables) {
+      if (t.tableMissing) {
+        lines.push(
+          `-- ตาราง \`${t.table}\` ยังไม่มีใน DB — ดู CREATE TABLE เต็มใน database/schema.sql แล้วรันเอง`
+        )
+        continue
+      }
+
+      const colDefs = definitions[t.table] ?? {}
+      for (const col of t.missingInDb) {
+        const def = colDefs[col]
+        if (def) {
+          lines.push(`ALTER TABLE \`${t.table}\` ADD COLUMN \`${col}\` ${def};`)
+        } else {
+          lines.push(
+            `-- ALTER TABLE \`${t.table}\` ADD COLUMN \`${col}\` ... -- ไม่พบนิยามคอลัมน์ใน schema.sql ตรวจสอบเอง`
+          )
+        }
+      }
+
+      for (const col of t.extraInDb) {
+        lines.push(
+          `-- \`${t.table}\`.\`${col}\` มีอยู่ใน DB จริงแต่ไม่มีใน schema.sql — ตรวจสอบเองก่อนว่าต้องเก็บไว้หรือไม่ (ไม่แนะนำ DROP COLUMN อัตโนมัติ)`
+        )
+      }
+    }
+
+    return lines.join('\n')
   }
 
   static async checkDrift(): Promise<DriftResult> {
@@ -117,6 +188,8 @@ export default class SchemaDriftService {
       }
     }
 
-    return { available: true, hasDrift: tables.length > 0, tables, checkedAt }
+    const alterSql = tables.length > 0 ? this.generateAlterSql(tables, sql) : undefined
+
+    return { available: true, hasDrift: tables.length > 0, tables, alterSql, checkedAt }
   }
 }

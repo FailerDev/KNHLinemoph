@@ -8,6 +8,7 @@ import FlexBuilderService from '#services/flex_builder_service'
 import FlexPreviewService from '#services/flex_preview_service'
 import { templateSaveValidator } from '#validators/template'
 import { parseFlexDesign } from '#validators/flex_design'
+import { ALL_FLEX_PRESETS } from '#data/flex_presets'
 import type { FlexDesign } from '#types/flex_design'
 
 const SYSTEM_VARS = [
@@ -78,6 +79,14 @@ export default class TemplatesController {
       })),
       systemVars: SYSTEM_VARS.map((key) => ({ key, label: SYSTEM_VAR_LABELS[key] })),
       cdcuVars: CDCU_VARS.map((key) => ({ key, label: CDCU_VAR_LABELS[key] })),
+      presets: ALL_FLEX_PRESETS.map((p) => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        category: p.category,
+        altText: p.altText,
+        design: p.design,
+      })),
       lineGroups: groups.map((g) => ({ id: g.id, name: g.groupName })),
     })
   }

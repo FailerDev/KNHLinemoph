@@ -1171,6 +1171,19 @@ a:hover { color: var(--brand-700); }
 .flex-len-counter        { text-align: right; }
 .flex-len-warn           { color: var(--danger); font-weight: 600; }
 
+.flex-preset-bar         { margin-bottom: 8px; }
+.flex-preset-panel       { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated); margin-bottom: 10px; overflow: hidden; }
+.flex-preset-panel-head  { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.flex-preset-list        { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; padding: 10px; max-height: 320px; overflow-y: auto; }
+.flex-preset-card        { border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--bg); display: flex; flex-direction: column; gap: 6px; }
+.flex-preset-card-title  { font-size: 13px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 6px; }
+.flex-preset-card-desc   { font-size: 11px; color: var(--text-soft); flex: 1; }
+.flex-preset-card .btn-modern { align-self: flex-start; }
+
+@media (max-width: 991px) {
+    .flex-preset-list { grid-template-columns: 1fr; max-height: 240px; }
+}
+
 .flex-preview-wrap       { background: #8CABD8; padding: 14px; border-radius: var(--radius); }
 .flex-preview-bubble     { background: #fff; border-radius: 12px; overflow: hidden; font-family: Sarabun, sans-serif; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
 .flex-preview-btn        { color: #fff; text-align: center; padding: 8px; border-radius: 6px; font-size: 13px; font-weight: 600; }

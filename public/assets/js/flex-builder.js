@@ -379,7 +379,13 @@
         })
       )
       host.appendChild(
-        field('โทนสี', selectInput(TONES, block.tone || 'muted', (v) => { block.tone = v; touch() }))
+        field('โทนสี', selectInput(TONES, block.tone || 'muted', (v) => {
+          block.tone = v
+          // ล้างสีที่กำหนดเองทิ้ง ไม่งั้นจะทับโทนใหม่แบบไม่มีทางรู้ว่าทำไมไม่เปลี่ยน
+          delete block.bg
+          delete block.color
+          touch()
+        }))
       )
     }
 
@@ -393,6 +399,20 @@
           selectInput(ASPECT_RATIOS, block.aspectRatio || '20:13', (v) => { block.aspectRatio = v; touch() }),
           'อัตราส่วน กว้าง:สูง ของกรอบรูป — ดูผลจริงได้จากตัวอย่างด้านขวา')
       )
+
+      const heroWrap = el('div', { class: 'form-check mb-2' })
+      const heroCb = el('input', { type: 'checkbox', class: 'form-check-input', id: 'flexImgHero' })
+      heroCb.checked = !!block.hero
+      heroCb.addEventListener('change', () => { block.hero = heroCb.checked; touch() })
+      heroWrap.appendChild(heroCb)
+      heroWrap.appendChild(el('label', {
+        class: 'form-check-label', for: 'flexImgHero', text: 'วางเป็นรูปเต็มขอบด้านบนสุด (hero)',
+      }))
+      host.appendChild(heroWrap)
+      host.appendChild(el('div', {
+        class: 'flex-hint mb-2',
+        text: 'การ์ดมีรูป hero ได้ใบเดียว ถ้าติ๊กมากกว่าหนึ่งรูป รูปที่เหลือจะกลายเป็นรูปในเนื้อการ์ดแทน',
+      }))
     }
 
     if (block.type === 'button') {
@@ -427,7 +447,14 @@
         grid.appendChild(valueRow)
         const pair = el('div', { class: 'd-flex gap-1' })
         pair.appendChild(textInput(cell.unit, (v) => { cell.unit = v; touch() }, { placeholder: 'หน่วย', ariaLabel: `หน่วยช่องที่ ${i + 1}` }))
-        pair.appendChild(selectInput(TONES, cell.tone || 'muted', (v) => { cell.tone = v; touch() }, { ariaLabel: `โทนสีช่องที่ ${i + 1}` }))
+        pair.appendChild(selectInput(TONES, cell.tone || 'muted', (v) => {
+          cell.tone = v
+          delete cell.bg
+          delete cell.color
+          delete cell.labelColor
+          delete cell.border
+          touch()
+        }, { ariaLabel: `โทนสีช่องที่ ${i + 1}` }))
         grid.appendChild(pair)
         row.appendChild(grid)
         row.appendChild(subRowControls(block.cells, i, refresh))
@@ -455,7 +482,11 @@
         }, `แทรกตัวแปรในค่าแถวที่ ${i + 1}`))
         grid.appendChild(valueRow)
         const pair = el('div', { class: 'd-flex gap-1' })
-        pair.appendChild(selectInput(TONES, row.tone || 'muted', (v) => { row.tone = v; touch() }, { ariaLabel: `โทนสีแถวที่ ${i + 1}` }))
+        pair.appendChild(selectInput(TONES, row.tone || 'muted', (v) => {
+          row.tone = v
+          delete row.color
+          touch()
+        }, { ariaLabel: `โทนสีแถวที่ ${i + 1}` }))
         grid.appendChild(pair)
         wrap.appendChild(grid)
         wrap.appendChild(subRowControls(block.rows, i, refresh))
@@ -686,6 +717,79 @@
     })
   }
 
+  // ---------- แกลเลอรีดีไซน์สำเร็จรูป ----------
+
+  function renderPresetList() {
+    const host = $('flexPresetList')
+    if (!host) return
+    host.innerHTML = ''
+    const presets = (window.FLEX_BUILDER_DATA || {}).presets || []
+
+    if (presets.length === 0) {
+      host.appendChild(el('div', { class: 'flex-hint', text: 'ยังไม่มีดีไซน์สำเร็จรูป' }))
+      return
+    }
+
+    presets.forEach((p) => {
+      const card = el('div', { class: 'flex-preset-card', role: 'listitem' })
+      card.appendChild(
+        el('div', {
+          class: 'flex-preset-card-title',
+          text: (p.category === 'cdcu' ? '🚑 ' : '🎨 ') + p.name,
+        })
+      )
+      card.appendChild(el('div', { class: 'flex-preset-card-desc', text: p.description }))
+      card.appendChild(
+        el(
+          'button',
+          {
+            type: 'button',
+            class: 'btn-modern btn-brand btn-sm',
+            onclick: () => loadPreset(p.id),
+          },
+          [document.createTextNode('ใช้ดีไซน์นี้')]
+        )
+      )
+      host.appendChild(card)
+    })
+  }
+
+  /** โหลด preset แทนที่นิยามบล็อกทั้งหมดที่กำลังแก้อยู่ — ต้องยืนยันก่อนเสมอ */
+  async function loadPreset(presetId) {
+    const presets = (window.FLEX_BUILDER_DATA || {}).presets || []
+    const preset = presets.find((p) => p.id === presetId)
+    if (!preset) return
+
+    const ok = await App.confirm({
+      title: `ใช้ดีไซน์ "${preset.name}"?`,
+      text: 'จะแทนที่บล็อกทั้งหมดที่แก้ไขอยู่ในตอนนี้ด้วยดีไซน์สำเร็จรูปนี้',
+      confirmText: 'ใช้ดีไซน์นี้',
+    })
+    if (!ok) return
+
+    // deep clone กันแก้ดีไซน์ต้นแบบที่แชร์จาก window.FLEX_BUILDER_DATA โดยไม่ตั้งใจ
+    state.design = JSON.parse(JSON.stringify(preset.design))
+    state.design.version = 1
+    state.design.blocks.forEach((b) => {
+      if (!b.id) b.id = nextId()
+    })
+    state.altText = preset.altText || ''
+    state.selectedId = state.design.blocks[0]?.id ?? null
+
+    const altInput = $('flexAltText')
+    if (altInput) altInput.value = state.altText
+    const themeInput = $('flexThemePrimary')
+    if (themeInput) themeInput.value = state.design.theme?.primary || '#1E3A8A'
+
+    renderList()
+    renderProps()
+    schedulePreview()
+    announce(`ใช้ดีไซน์ ${preset.name} แล้ว รวม ${state.design.blocks.length} บล็อก`)
+
+    const panel = $('flexPresetPanel')
+    if (panel) panel.hidden = true
+  }
+
   // ---------- การเชื่อมต่อกับฟอร์ม ----------
 
   function bindOnce() {
@@ -716,6 +820,19 @@
       state.design.theme = state.design.theme || {}
       state.design.theme.primary = e.target.value
       schedulePreview()
+    })
+
+    $('flexPresetBtn')?.addEventListener('click', () => {
+      const panel = $('flexPresetPanel')
+      if (!panel) return
+      const opening = panel.hidden
+      if (opening) renderPresetList()
+      panel.hidden = !opening
+    })
+
+    $('flexPresetClose')?.addEventListener('click', () => {
+      const panel = $('flexPresetPanel')
+      if (panel) panel.hidden = true
     })
 
     $('flexLiveBtn')?.addEventListener('click', () => runPreview(true))

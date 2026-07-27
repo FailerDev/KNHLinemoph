@@ -4,6 +4,19 @@
   markup อย่างเดียว สถานะทั้งหมดอยู่ใน public/assets/js/flex-builder.js
   ต้องมี window.FLEX_BUILDER_DATA ตั้งค่าไว้ก่อน (ดู templates.edge)
 --}}
+<div class="flex-preset-bar">
+  <button type="button" class="btn-modern btn-soft btn-sm" id="flexPresetBtn">
+    <i class="bi bi-magic" aria-hidden="true"></i> เลือกจากดีไซน์สำเร็จรูป
+  </button>
+</div>
+<div id="flexPresetPanel" class="flex-preset-panel" hidden>
+  <div class="flex-preset-panel-head">
+    <strong>ดีไซน์สำเร็จรูป</strong>
+    <button type="button" class="btn-close btn-sm" id="flexPresetClose" aria-label="ปิดแผงดีไซน์สำเร็จรูป"></button>
+  </div>
+  <div class="flex-preset-list" id="flexPresetList" role="list"></div>
+</div>
+
 <div class="flex-builder" id="flexBuilder">
 
   {{-- คอลัมน์ซ้าย: รายการบล็อก --}}

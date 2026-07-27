@@ -195,7 +195,10 @@
       key: v.key,
       label: v.result_mode === 'rows' ? `${v.name} (จำนวนแถว)` : v.name,
     }))
-    return sys.concat(items)
+    // ใช้ได้เฉพาะเทมเพลตที่ผูกกับ CDCU watch group เท่านั้น — ติด "CDCU:" ไว้
+    // กันสับสนว่าใช้ได้ทั่วไปเหมือนตัวแปรระบบ/รายการข้อมูล
+    const cdcu = (data.cdcuVars || []).map((v) => ({ key: v.key, label: `CDCU: ${v.label}` }))
+    return sys.concat(items, cdcu)
   }
 
   /**

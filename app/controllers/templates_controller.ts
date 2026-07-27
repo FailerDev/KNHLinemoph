@@ -25,6 +25,32 @@ const SYSTEM_VAR_LABELS: Record<string, string> = {
   site_footer: 'ท้ายข้อความ',
 }
 
+/**
+ * ตัวแปรผู้ป่วยที่ใช้ได้เฉพาะเทมเพลตที่ผูกกับ CDCU (cdcu_watch_groups.template_id)
+ * ต้องตรงกับ `patient` dict ใน CdcuService.buildPayload() ทุกตัว — ถ้าเพิ่ม field
+ * ใหม่ที่นั่น ต้องมาเพิ่มที่นี่ด้วยไม่งั้น picker จะไม่รู้จัก
+ */
+const CDCU_VAR_LABELS: Record<string, string> = {
+  hn: 'HN ผู้ป่วย',
+  vn: 'VN ครั้งที่มา',
+  pt_name: 'ชื่อผู้ป่วย',
+  age: 'อายุ (ปี)',
+  icd10: 'รหัส ICD-10',
+  icd10_name: 'ชื่อโรค (ICD-10)',
+  vstdate_th: 'วันที่มา (ไทย)',
+  vsttime: 'เวลาที่มา',
+  temperature: 'อุณหภูมิ',
+  pulse: 'ชีพจร',
+  rr: 'อัตราการหายใจ',
+  bps: 'ความดันบน',
+  bpd: 'ความดันล่าง',
+  cc: 'อาการสำคัญ (CC)',
+  dx_code_note: 'หมายเหตุการวินิจฉัย',
+  hometel: 'เบอร์โทรบ้าน',
+  informaddr: 'ที่อยู่ผู้แจ้ง',
+}
+const CDCU_VARS = Object.keys(CDCU_VAR_LABELS)
+
 export default class TemplatesController {
   async index({ view }: HttpContext) {
     const [templates, items, groups] = await Promise.all([
@@ -44,13 +70,14 @@ export default class TemplatesController {
         variables: t.variables ?? [],
         is_active: !!t.isActive,
       })),
-      knownVars: [...SYSTEM_VARS, ...items.map((i) => i.itemKey)],
+      knownVars: [...SYSTEM_VARS, ...CDCU_VARS, ...items.map((i) => i.itemKey)],
       itemVars: items.map((i) => ({
         key: i.itemKey,
         name: i.itemName,
         result_mode: i.resultMode,
       })),
       systemVars: SYSTEM_VARS.map((key) => ({ key, label: SYSTEM_VAR_LABELS[key] })),
+      cdcuVars: CDCU_VARS.map((key) => ({ key, label: CDCU_VAR_LABELS[key] })),
       lineGroups: groups.map((g) => ({ id: g.id, name: g.groupName })),
     })
   }
@@ -93,7 +120,9 @@ export default class TemplatesController {
     }
 
     const items = await NotificationItem.query().select('item_key').where('is_active', 1)
-    const known = new Set([...SYSTEM_VARS, ...items.map((i) => i.itemKey)])
+    // CDCU_VARS นับเป็นตัวแปรที่รู้จักเสมอ แม้เทมเพลตนี้จะยังไม่ถูกผูกกับ CDCU
+    // watch group ใด ๆ ก็ตาม — ผู้ใช้อาจสร้างเทมเพลตเผื่อไว้ก่อนแล้วค่อยไปผูกทีหลัง
+    const known = new Set([...SYSTEM_VARS, ...CDCU_VARS, ...items.map((i) => i.itemKey)])
     const unknown = vars.filter((v) => !known.has(v))
 
     const idRaw = request.input('id', null)

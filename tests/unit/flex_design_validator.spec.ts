@@ -120,6 +120,136 @@ test.group('parseFlexDesign', () => {
     await assert.rejects(() => parseFlexDesign(JSON.stringify(bad)))
   })
 
+  test('รับสี hex 8 หลักที่มีความโปร่งใส (header.background)', async ({ assert }) => {
+    const good = {
+      version: 1,
+      blocks: [{ id: 'h', type: 'header', title: 'x', background: '#FFFFFF33' }],
+    }
+    const parsed = await parseFlexDesign(JSON.stringify(good))
+    assert.equal((parsed.blocks[0] as any).background, '#FFFFFF33')
+  })
+
+  test('ปฏิเสธสี hex ที่ผิดรูปแบบใน header.titleColor', async ({ assert }) => {
+    const bad = {
+      version: 1,
+      blocks: [{ id: 'h', type: 'header', title: 'x', titleColor: 'red' }],
+    }
+    await assert.rejects(() => parseFlexDesign(JSON.stringify(bad)), /สีตัวอักษรหัวข้อ/)
+  })
+
+  test('รับ gradient background ที่ถูกต้องบน theme', async ({ assert }) => {
+    const good = {
+      version: 1,
+      theme: {
+        background: { type: 'linearGradient', angle: '135deg', startColor: '#4F46E5', endColor: '#06B6D4' },
+      },
+      blocks: [],
+    }
+    const parsed = await parseFlexDesign(JSON.stringify(good))
+    assert.deepEqual(parsed.theme!.background, {
+      type: 'linearGradient',
+      angle: '135deg',
+      startColor: '#4F46E5',
+      endColor: '#06B6D4',
+    })
+  })
+
+  test('ปฏิเสธ gradient ที่ไม่มี startColor', async ({ assert }) => {
+    const bad = {
+      version: 1,
+      theme: { background: { type: 'linearGradient', angle: '135deg', endColor: '#06B6D4' } },
+      blocks: [],
+    }
+    await assert.rejects(() => parseFlexDesign(JSON.stringify(bad)), /startColor/)
+  })
+
+  test('ปฏิเสธ gradient ที่ type ไม่ใช่ linearGradient', async ({ assert }) => {
+    const bad = {
+      version: 1,
+      theme: { background: { type: 'radial', angle: '135deg', startColor: '#000000', endColor: '#FFFFFF' } },
+      blocks: [],
+    }
+    await assert.rejects(() => parseFlexDesign(JSON.stringify(bad)), /linearGradient/)
+  })
+
+  test('ปฏิเสธ angle ที่ไม่มีหน่วย deg', async ({ assert }) => {
+    const bad = {
+      version: 1,
+      theme: { background: { type: 'linearGradient', angle: '135', startColor: '#000000', endColor: '#FFFFFF' } },
+      blocks: [],
+    }
+    await assert.rejects(() => parseFlexDesign(JSON.stringify(bad)), /angle/)
+  })
+
+  test('รับบล็อก image ที่ hero:true', async ({ assert }) => {
+    const good = {
+      version: 1,
+      blocks: [{ id: 'i', type: 'image', url: 'https://example.com/a.png', hero: true }],
+    }
+    const parsed = await parseFlexDesign(JSON.stringify(good))
+    assert.isTrue((parsed.blocks[0] as any).hero)
+  })
+
+  test('รับบล็อก progress ที่ถูกต้อง', async ({ assert }) => {
+    const good = {
+      version: 1,
+      blocks: [
+        {
+          id: 'p',
+          type: 'progress',
+          rows: [{ label: 'X-ray', value: '93%', percent: 93, color: '#14B8A6' }],
+        },
+      ],
+    }
+    const parsed = await parseFlexDesign(JSON.stringify(good))
+    assert.equal((parsed.blocks[0] as any).rows[0].percent, 93)
+  })
+
+  test('ปฏิเสธ progress ที่ percent เกิน 100', async ({ assert }) => {
+    const bad = {
+      version: 1,
+      blocks: [{ id: 'p', type: 'progress', rows: [{ label: 'x', value: 'x', percent: 150 }] }],
+    }
+    await assert.rejects(() => parseFlexDesign(JSON.stringify(bad)))
+  })
+
+  test('รับ kpi cell ที่กำหนดสีเอง (bg/color/border)', async ({ assert }) => {
+    const good = {
+      version: 1,
+      blocks: [
+        {
+          id: 'k',
+          type: 'kpi',
+          columns: 2,
+          variant: 'card',
+          cells: [{ label: 'OPD', value: '10', bg: '#1E293B', color: '#38BDF8', border: '#334155' }],
+        },
+      ],
+    }
+    const parsed = await parseFlexDesign(JSON.stringify(good))
+    const cell = (parsed.blocks[0] as any).cells[0]
+    assert.equal(cell.bg, '#1E293B')
+    assert.equal(cell.color, '#38BDF8')
+    assert.equal(cell.border, '#334155')
+  })
+
+  test('รับ list ที่มี heading + stripeColor (สไตล์แถบข้าง)', async ({ assert }) => {
+    const good = {
+      version: 1,
+      blocks: [
+        {
+          id: 'l',
+          type: 'list',
+          heading: 'ผู้ป่วย',
+          stripeColor: '#2563EB',
+          rows: [{ label: 'OPD', value: '10' }],
+        },
+      ],
+    }
+    const parsed = await parseFlexDesign(JSON.stringify(good))
+    assert.equal((parsed.blocks[0] as any).stripeColor, '#2563EB')
+  })
+
   test('ปฏิเสธการ์ดที่มีบล็อกเกิน 30 ชิ้น', async ({ assert }) => {
     const bad = {
       version: 1,

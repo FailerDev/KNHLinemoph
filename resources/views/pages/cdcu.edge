@@ -1,0 +1,508 @@
+@component('layouts/app', { title: 'CDCU เฝ้าระวังโรค' })
+  @slot('main')
+
+    {{-- Stats --}}
+    <div class="stat-grid mb-4">
+      <div class="stat-card">
+        <p class="stat-label">กลุ่มเฝ้าระวังทั้งหมด</p>
+        <p class="stat-value">{{ watchGroups.length }}</p>
+        <span class="stat-trend flat"><i class="bi bi-shield-check"></i> กลุ่มโรค</span>
+        <div class="stat-icon tone-info"><i class="bi bi-virus2"></i></div>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">เปิดใช้งาน</p>
+        <p class="stat-value text-brand">{{ watchGroups.filter(w => w.is_active).length }}</p>
+        <span class="stat-trend flat">จาก {{ watchGroups.length }} กลุ่ม</span>
+        <div class="stat-icon tone-brand"><i class="bi bi-activity"></i></div>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">ส่งแจ้งเตือนวันนี้</p>
+        <p class="stat-value">{{ sentToday }}</p>
+        <span class="stat-trend flat"><i class="bi bi-calendar-check"></i> {{ today }}</span>
+        <div class="stat-icon tone-success"><i class="bi bi-send-check"></i></div>
+      </div>
+    </div>
+
+    {{-- Watch Groups Table --}}
+    <div class="card-modern mb-4">
+      <div class="card-modern-header">
+        <h2><i class="bi bi-virus2 text-brand" aria-hidden="true"></i> กลุ่มเฝ้าระวังโรค <span class="text-muted-soft">({{ watchGroups.length }})</span></h2>
+        <button class="btn-modern btn-brand" onclick="Cdcu.openNew()">
+          <i class="bi bi-plus-lg" aria-hidden="true"></i> เพิ่มกลุ่มเฝ้าระวัง
+        </button>
+      </div>
+      <div class="card-modern-body" style="padding:0;">
+        @if(watchGroups.length === 0)
+          <div class="empty-state">
+            <i class="bi bi-virus2" aria-hidden="true"></i>
+            <h4>ยังไม่มีกลุ่มเฝ้าระวัง</h4>
+            <p>กดปุ่ม "เพิ่มกลุ่มเฝ้าระวัง" เพื่อกำหนด ICD-10 codes ที่ต้องการแจ้งเตือน</p>
+          </div>
+        @else
+          <div class="table-responsive">
+            <table class="table-modern">
+              <thead>
+                <tr>
+                  <th>ชื่อกลุ่ม</th>
+                  <th>ICD-10 Codes</th>
+                  <th>วัน</th>
+                  <th>LINE Groups</th>
+                  <th>Template</th>
+                  <th>สถานะ</th>
+                  <th class="text-end">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody>
+                @each(wg in watchGroups)
+                  <tr>
+                    <td>
+                      <strong>{{ wg.group_name }}</strong>
+                      @if(wg.description)
+                        <br><small class="text-muted-soft">{{ wg.description }}</small>
+                      @end
+                    </td>
+                    <td>
+                      @each(code in wg.icd10_codes.slice(0, 5))
+                        <span class="badge-modern badge-info" style="font-size:11px;">{{ code }}</span>
+                      @end
+                      @if(wg.icd10_codes.length > 5)
+                        <span class="text-muted-soft" style="font-size:11px;">+{{ wg.icd10_codes.length - 5 }}</span>
+                      @end
+                    </td>
+                    <td>
+                      @let(dayNames = ['อา','จ','อ','พ','พฤ','ศ','ส'])
+                      @let(wgDays = wg.days_of_week.split(',').map(d => parseInt(d)))
+                      <small>
+                        @each(d in [1,2,3,4,5,6,7])
+                          <span style="opacity: {{ wgDays.includes(d) ? '1' : '0.2' }};">{{ dayNames[d-1] }}</span>
+                        @end
+                      </small>
+                    </td>
+                    <td>
+                      @each(name in wg.line_group_names.slice(0, 2))
+                        <small class="d-block">{{ name }}</small>
+                      @end
+                      @if(wg.line_group_names.length > 2)
+                        <small class="text-muted-soft">+{{ wg.line_group_names.length - 2 }} กลุ่ม</small>
+                      @end
+                    </td>
+                    <td>
+                      <small>{{ wg.template_name ?? 'Default' }}</small>
+                      @if(wg.template_id)
+                        @if(wg.template_message_type === 'flex')
+                          <span class="badge-modern badge-info" style="font-size:10px;"><i class="bi bi-card-heading" aria-hidden="true"></i> Flex</span>
+                        @else
+                          <span class="badge-modern badge-neutral" style="font-size:10px;">ข้อความ</span>
+                        @end
+                      @end
+                      @if(wg.mask_name)
+                        <br><span class="badge-modern badge-neutral" style="font-size:10px;"><i class="bi bi-eye-slash"></i> เข้ารหัสชื่อ</span>
+                      @end
+                    </td>
+                    <td>
+                      @if(wg.is_active)
+                        <span class="badge-modern badge-success">เปิด</span>
+                      @else
+                        <span class="badge-modern badge-neutral">ปิด</span>
+                      @end
+                    </td>
+                    <td class="text-end">
+                      <button class="btn-modern btn-ghost btn-sm btn-icon" onclick="Cdcu.run({{ wg.id }}, '{{ wg.group_name }}')" title="รันทันที" aria-label="รันทันที {{ wg.group_name }}">
+                        <i class="bi bi-play-circle" aria-hidden="true"></i>
+                      </button>
+                      <button class="btn-modern btn-ghost btn-sm btn-icon" onclick="Cdcu.viewLogs({{ wg.id }})" title="ดู Log" aria-label="ดู Log {{ wg.group_name }}">
+                        <i class="bi bi-clock-history" aria-hidden="true"></i>
+                      </button>
+                      <button class="btn-modern btn-soft btn-sm btn-icon" onclick='Cdcu.openEdit({{{ JSON.stringify(wg) }}})' title="แก้ไข" aria-label="แก้ไข {{ wg.group_name }}">
+                        <i class="bi bi-pencil" aria-hidden="true"></i>
+                      </button>
+                      <button class="btn-modern btn-ghost btn-sm btn-icon" onclick="Cdcu.toggle({{ wg.id }}, {{ wg.is_active }})" title="{{ wg.is_active ? 'ปิด' : 'เปิด' }}" aria-label="{{ wg.is_active ? 'ปิด' : 'เปิด' }} {{ wg.group_name }}">
+                        <i class="bi bi-{{ wg.is_active ? 'pause-circle' : 'play-circle-fill' }}" aria-hidden="true"></i>
+                      </button>
+                      <button class="btn-modern btn-danger-soft btn-sm btn-icon" onclick="Cdcu.remove({{ wg.id }}, '{{ wg.group_name }}')" title="ลบ" aria-label="ลบ {{ wg.group_name }}">
+                        <i class="bi bi-trash" aria-hidden="true"></i>
+                      </button>
+                    </td>
+                  </tr>
+                @end
+              </tbody>
+            </table>
+          </div>
+        @end
+      </div>
+    </div>
+
+    {{-- Logs --}}
+    <div class="card-modern" id="logsCard">
+      <div class="card-modern-header">
+        <h2><i class="bi bi-clock-history text-brand" aria-hidden="true"></i> ประวัติการแจ้งเตือน CDCU</h2>
+        <div class="d-flex gap-2 align-items-center">
+          <input type="date" id="logDate" class="form-control form-control-sm" value="{{ today }}" style="width:150px;" onchange="Cdcu.loadLogs()" aria-label="กรองตามวันที่">
+          <select id="logGroupFilter" class="form-select form-select-sm" style="width:180px;" onchange="Cdcu.loadLogs()" aria-label="กรองตามกลุ่มเฝ้าระวัง">
+            <option value="">— ทุกกลุ่ม —</option>
+            @each(wg in watchGroups)
+              <option value="{{ wg.id }}">{{ wg.group_name }}</option>
+            @end
+          </select>
+          <button class="btn-modern btn-soft btn-sm" onclick="Cdcu.clearOldLogs()">
+            <i class="bi bi-trash" aria-hidden="true"></i> ล้างเก่า
+          </button>
+        </div>
+      </div>
+      <div class="card-modern-body" style="padding:0;">
+        <div id="logsTableWrap">
+          <div class="empty-state"><i class="bi bi-arrow-clockwise"></i><h4>กำลังโหลด...</h4></div>
+        </div>
+      </div>
+    </div>
+
+    {{-- Add/Edit Modal --}}
+    <div class="modal fade" id="cdcuModal" tabindex="-1" aria-hidden="true" aria-labelledby="cdcuModalTitle">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+          <form id="cdcuForm" class="form-modern" novalidate>
+            <input type="hidden" name="id">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+            <div class="modal-header">
+              <h5 class="modal-title" id="cdcuModalTitle">
+                <i class="bi bi-virus2 text-brand" aria-hidden="true"></i> เพิ่มกลุ่มเฝ้าระวัง
+              </h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
+            </div>
+
+            <div class="modal-body">
+              <div class="row g-3">
+                <div class="col-md-8">
+                  <label class="form-label">ชื่อกลุ่มเฝ้าระวัง *</label>
+                  <input type="text" class="form-control" name="group_name" required maxlength="200" placeholder="เช่น ไข้เลือดออก / Dengue">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">HIS Database</label>
+                  <select class="form-select" name="his_database">
+                    <option value="hos">hos (default)</option>
+                    @each(h in hisDbs)
+                      <option value="{{ h.name }}">{{ h.name }}</option>
+                    @end
+                  </select>
+                </div>
+
+                <div class="col-12">
+                  <label class="form-label">ICD-10 Codes * <small class="text-muted-soft">(หนึ่งรายการต่อบรรทัด หรือคั่นด้วย ,)</small></label>
+                  <textarea class="form-control" name="icd10_codes" rows="4" required
+                    style="font-family:ui-monospace,monospace;font-size:13px;"
+                    placeholder="A90&#10;A91&#10;J09&#10;J10&#10;J11&#10;B349&#10;R509"></textarea>
+                  <div class="form-text">รองรับทั้งรหัสเดี่ยว (A90) และหลายรหัสพร้อมกัน</div>
+                </div>
+
+                <div class="col-12">
+                  <label class="form-label">LINE Groups ที่จะส่ง *</label>
+                  <div class="row g-2" id="lineGroupCheckboxes">
+                    @each(g in lineGroups)
+                      <div class="col-md-4">
+                        <div class="form-check">
+                          <input class="form-check-input" type="checkbox" name="line_group_ids" value="{{ g.id }}" id="lg_{{ g.id }}">
+                          <label class="form-check-label" for="lg_{{ g.id }}">{{ g.name }}</label>
+                        </div>
+                      </div>
+                    @end
+                    @if(lineGroups.length === 0)
+                      <div class="col-12"><small class="text-muted-soft">ยังไม่มีกลุ่ม LINE — กรุณาสร้างในหน้า "กลุ่ม LINE" ก่อน</small></div>
+                    @end
+                  </div>
+                </div>
+
+                <div class="col-12">
+                  <label class="form-label">
+                    Template ข้อความ <small class="text-muted-soft">(เว้นว่างเพื่อใช้ข้อความ Default)</small>
+                    <span id="templateModeBadge" class="badge-modern badge-neutral" style="font-size:10px;" hidden></span>
+                  </label>
+                  <select class="form-select" name="template_id" onchange="Cdcu.updateTemplateModeBadge()">
+                    <option value="">— Default (แสดงข้อมูลผู้ป่วยอัตโนมัติ) —</option>
+                    @each(t in templates)
+                      <option value="{{ t.id }}" data-mode="{{ t.message_type }}">{{ t.name }}</option>
+                    @end
+                  </select>
+                  <div class="form-text">
+                    Placeholders ที่ใช้ได้ใน template (ใช้ได้ทั้งข้อความธรรมดาและการ์ด Flex):
+                    <code>{hn}</code> <code>{vn}</code> <code>{pt_name}</code> <code>{age}</code>
+                    <code>{icd10}</code> <code>{icd10_name}</code> <code>{vstdate_th}</code> <code>{vsttime}</code>
+                    <code>{temperature}</code> <code>{pulse}</code> <code>{rr}</code> <code>{bps}</code> <code>{bpd}</code>
+                    <code>{cc}</code> <code>{dx_code_note}</code> <code>{hometel}</code> <code>{informaddr}</code>
+                    และ system: <code>{date_th}</code> <code>{org_name}</code>
+                  </div>
+                  <div class="form-text" id="templateFlexTableWarn" hidden style="color:var(--warning);">
+                    <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+                    CDCU ไม่มีข้อมูลป้อนบล็อก "ตาราง" ในการ์ด Flex — ถ้าเทมเพลตนี้มีบล็อกตาราง จะแสดงเป็น "ไม่พบข้อมูล" เสมอ
+                  </div>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label">วันที่ทำงาน</label>
+                  <div class="d-flex gap-2 flex-wrap mt-1">
+                    @let(dayLabels = ['อา','จ','อ','พ','พฤ','ศ','ส'])
+                    @each(d in [1,2,3,4,5,6,7])
+                      <div class="form-check form-check-inline">
+                        <input class="form-check-input dow-check" type="checkbox" value="{{ d }}" id="dow_{{ d }}" checked>
+                        <label class="form-check-label" for="dow_{{ d }}">{{ dayLabels[d-1] }}</label>
+                      </div>
+                    @end
+                  </div>
+                </div>
+
+                <div class="col-12">
+                  <label class="form-label">รายละเอียด (ไม่บังคับ)</label>
+                  <input type="text" class="form-control" name="description" maxlength="500">
+                </div>
+
+                <div class="col-md-6">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" name="is_active" value="1" id="cdcuActiveSwitch" checked>
+                    <label class="form-check-label" for="cdcuActiveSwitch">เปิดใช้งาน</label>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" name="mask_name" value="1" id="cdcuMaskSwitch">
+                    <label class="form-check-label" for="cdcuMaskSwitch">
+                      <i class="bi bi-eye-slash"></i> เข้ารหัสชื่อผู้ป่วย
+                      <span class="text-muted-soft" style="font-size:11px;">(นายxxxทดสอบ xxxทดสอบ)</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="modal-footer">
+              <button type="button" class="btn-modern btn-ghost" data-bs-dismiss="modal">ยกเลิก</button>
+              <button type="submit" class="btn-modern btn-brand"><i class="bi bi-save" aria-hidden="true"></i> บันทึก</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    {{-- Log Detail Modal --}}
+    <div class="modal fade" id="cdcuLogModal" tabindex="-1" aria-hidden="true" aria-labelledby="cdcuLogModalTitle">
+      <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="cdcuLogModalTitle"><i class="bi bi-clock-history text-brand" aria-hidden="true"></i> Log รายละเอียด</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
+          </div>
+          <div class="modal-body p-0" id="logModalBody">
+            <div class="empty-state"><i class="bi bi-hourglass"></i><h4>กำลังโหลด</h4></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  @end
+@end
+
+<script>
+const Cdcu = (() => {
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.content ?? ''
+
+  async function ajax(url, data) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf },
+      body: JSON.stringify(data),
+    })
+    return res.json()
+  }
+
+  function modal(id) { return bootstrap.Modal.getOrCreateInstance(document.getElementById(id)) }
+
+  /** อัปเดตป้าย text/Flex ข้าง select template ให้ตรงกับตัวเลือกปัจจุบันเสมอ */
+  function updateTemplateModeBadge() {
+    const sel = document.querySelector('[name="template_id"]')
+    const badge = document.getElementById('templateModeBadge')
+    const tableWarn = document.getElementById('templateFlexTableWarn')
+    const opt = sel.selectedOptions[0]
+    const mode = opt ? opt.dataset.mode : undefined
+
+    if (!sel.value || !mode) {
+      badge.hidden = true
+      tableWarn.hidden = true
+      return
+    }
+
+    badge.hidden = false
+    const isFlex = mode === 'flex'
+    badge.textContent = isFlex ? 'Flex' : 'ข้อความ'
+    badge.className = 'badge-modern ' + (isFlex ? 'badge-info' : 'badge-neutral')
+    tableWarn.hidden = !isFlex
+  }
+
+  function openNew() {
+    document.getElementById('cdcuModalTitle').innerHTML = '<i class="bi bi-virus2 text-brand" aria-hidden="true"></i> เพิ่มกลุ่มเฝ้าระวัง'
+    document.getElementById('cdcuForm').reset()
+    document.querySelectorAll('.dow-check').forEach(c => c.checked = true)
+    document.querySelectorAll('[name="line_group_ids"]').forEach(c => c.checked = false)
+    document.querySelector('[name="id"]').value = ''
+    updateTemplateModeBadge()
+    modal('cdcuModal').show()
+  }
+
+  function openEdit(wg) {
+    document.getElementById('cdcuModalTitle').innerHTML = '<i class="bi bi-pencil text-brand" aria-hidden="true"></i> แก้ไขกลุ่มเฝ้าระวัง'
+    const f = document.getElementById('cdcuForm')
+    f.querySelector('[name="id"]').value = wg.id
+    f.querySelector('[name="group_name"]').value = wg.group_name
+    f.querySelector('[name="icd10_codes"]').value = wg.icd10_codes.join('\n')
+    f.querySelector('[name="his_database"]').value = wg.his_database || 'hos'
+    f.querySelector('[name="description"]').value = wg.description ?? ''
+    f.querySelector('[name="template_id"]').value = wg.template_id ?? ''
+    f.querySelector('[name="is_active"]').checked = !!wg.is_active
+    f.querySelector('[name="mask_name"]').checked  = !!wg.mask_name
+    updateTemplateModeBadge()
+
+    // Days of week
+    const days = String(wg.days_of_week).split(',').map(Number)
+    document.querySelectorAll('.dow-check').forEach(c => {
+      c.checked = days.includes(parseInt(c.value))
+    })
+
+    // LINE group checkboxes
+    const lgIds = (wg.line_group_ids ?? []).map(Number)
+    document.querySelectorAll('[name="line_group_ids"]').forEach(c => {
+      c.checked = lgIds.includes(parseInt(c.value))
+    })
+
+    modal('cdcuModal').show()
+  }
+
+  document.getElementById('cdcuForm').addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const f = e.currentTarget
+    const days = [...document.querySelectorAll('.dow-check:checked')].map(c => c.value).join(',')
+    const lgIds = [...document.querySelectorAll('[name="line_group_ids"]:checked')].map(c => Number(c.value))
+
+    const data = {
+      id:             f.querySelector('[name="id"]').value,
+      group_name:     f.querySelector('[name="group_name"]').value,
+      icd10_codes:    f.querySelector('[name="icd10_codes"]').value,
+      his_database:   f.querySelector('[name="his_database"]').value,
+      template_id:    f.querySelector('[name="template_id"]').value || null,
+      days_of_week:   days || '1,2,3,4,5,6,7',
+      line_group_ids: lgIds,
+      description:    f.querySelector('[name="description"]').value,
+      is_active:      f.querySelector('[name="is_active"]').checked ? '1' : '0',
+      mask_name:      f.querySelector('[name="mask_name"]').checked ? '1' : '0',
+    }
+
+    const btn = f.querySelector('[type="submit"]')
+    btn.disabled = true
+    try {
+      const res = await ajax('/cdcu/save', data)
+      if (res.success) {
+        modal('cdcuModal').hide()
+        Swal.fire({ icon: 'success', title: res.message, timer: 1200, showConfirmButton: false })
+          .then(() => location.reload())
+      } else {
+        Swal.fire({ icon: 'error', title: 'ผิดพลาด', text: res.message })
+      }
+    } finally { btn.disabled = false }
+  })
+
+  async function remove(id, name) {
+    const r = await Swal.fire({
+      icon: 'warning', title: 'ลบกลุ่มเฝ้าระวัง?',
+      text: name, showCancelButton: true,
+      confirmButtonText: 'ลบ', cancelButtonText: 'ยกเลิก',
+    })
+    if (!r.isConfirmed) return
+    const res = await ajax('/cdcu/delete', { id })
+    if (res.success) {
+      Swal.fire({ icon: 'success', title: 'ลบสำเร็จ', timer: 900, showConfirmButton: false })
+        .then(() => location.reload())
+    } else {
+      Swal.fire({ icon: 'error', title: 'ผิดพลาด', text: res.message })
+    }
+  }
+
+  async function toggle(id, currentState) {
+    const res = await ajax('/cdcu/toggle', { id })
+    if (res.success) location.reload()
+    else Swal.fire({ icon: 'error', title: 'ผิดพลาด', text: res.message })
+  }
+
+  async function run(id, name) {
+    const r = await Swal.fire({
+      icon: 'question', title: 'รันทันทีสำหรับ', text: name,
+      showCancelButton: true, confirmButtonText: 'รัน', cancelButtonText: 'ยกเลิก',
+    })
+    if (!r.isConfirmed) return
+    Swal.fire({ title: 'กำลังรัน...', allowOutsideClick: false, didOpen: () => Swal.showLoading() })
+    const res = await ajax('/cdcu/run', { id })
+    if (res.success) {
+      Swal.fire({ icon: 'success', title: 'รันสำเร็จ', text: res.message })
+      loadLogs()
+    } else {
+      Swal.fire({ icon: 'error', title: 'ผิดพลาด', text: res.message })
+    }
+  }
+
+  async function loadLogs() {
+    const date  = document.getElementById('logDate').value
+    const wgId  = document.getElementById('logGroupFilter').value
+    const wrap  = document.getElementById('logsTableWrap')
+    wrap.innerHTML = '<div class="empty-state"><i class="bi bi-arrow-clockwise spin"></i><h4>กำลังโหลด...</h4></div>'
+    const res = await ajax('/cdcu/logs', { date, watch_group_id: wgId || 0 })
+    if (!res.success || res.logs.length === 0) {
+      wrap.innerHTML = '<div class="empty-state"><i class="bi bi-inbox"></i><h4>ไม่พบประวัติ</h4></div>'
+      return
+    }
+    const rows = res.logs.map(l => `
+      <tr>
+        <td><small>${l.sent_at ?? ''}</small></td>
+        <td><small>${l.watch_group_name ?? '—'}</small></td>
+        <td><small>${l.vn ?? ''}</small></td>
+        <td><small>${l.hn ?? ''}</small></td>
+        <td><small>${l.pt_name ?? ''}</small></td>
+        <td><span class="badge-modern badge-info" style="font-size:11px;">${l.icd10 ?? ''}</span></td>
+        <td><small>${l.line_group_name ?? '—'}</small></td>
+        <td>
+          <span class="badge-modern ${l.status_code === 200 ? 'badge-success' : 'badge-danger'}">
+            ${l.status_code ?? '—'}
+          </span>
+        </td>
+      </tr>`).join('')
+    wrap.innerHTML = `
+      <div class="table-responsive">
+        <table class="table-modern">
+          <thead><tr>
+            <th>เวลา</th><th>กลุ่มเฝ้าระวัง</th><th>VN</th><th>HN</th><th>ชื่อ</th>
+            <th>ICD-10</th><th>LINE Group</th><th>Status</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`
+  }
+
+  async function viewLogs(wgId) {
+    document.getElementById('logGroupFilter').value = wgId
+    loadLogs()
+    document.getElementById('logsCard').scrollIntoView({ behavior: 'smooth' })
+  }
+
+  async function clearOldLogs() {
+    const { value } = await Swal.fire({
+      title: 'ล้าง Log เก่ากี่วัน?', input: 'number',
+      inputValue: 30, inputAttributes: { min: 1, max: 365 },
+      showCancelButton: true, confirmButtonText: 'ล้าง', cancelButtonText: 'ยกเลิก',
+    })
+    if (!value) return
+    const res = await ajax('/cdcu/clear-logs', { days: value })
+    Swal.fire({ icon: res.success ? 'success' : 'error', title: res.message })
+    if (res.success) loadLogs()
+  }
+
+  // Auto-load logs on page ready
+  document.addEventListener('DOMContentLoaded', loadLogs)
+
+  return { openNew, openEdit, remove, toggle, run, loadLogs, viewLogs, clearOldLogs, updateTemplateModeBadge }
+})()
+</script>

@@ -409,6 +409,41 @@ VALUES
 1);
 
 -- ============================================================
+-- Seed — notification_templates (Default (Flex) สำหรับ CDCU)
+-- ให้กลุ่มเฝ้าระวัง CDCU มีเทมเพลต Flex ใช้ได้ทันทีโดยไม่ต้องสร้างเอง —
+-- มาจาก CDCU_FLEX_PRESET ใน app/data/flex_presets.ts (อ่านค่าจริงกลับจาก DB
+-- หลังบันทึกผ่าน /templates/save เพื่อให้ flex_design ตรงกับที่ FlexBuilderService
+-- ผลิตจริงทุก byte ไม่ใช่พิมพ์ JSON มือ)
+-- ============================================================
+INSERT INTO `notification_templates`
+  (`template_name`, `template_content`, `message_type`, `flex_design`, `alt_text`, `variables`, `is_active`)
+VALUES
+('Default (แสดงข้อมูลผู้ป่วยอัตโนมัติ) - Flex',
+'🚨 แจ้งเตือนผู้ป่วยเฝ้าระวัง
+{org_name} • {vstdate_th} {vsttime}
+
+HN: {hn}
+ICD-10: {icd10}
+อายุ: {age} ปี
+ชื่อผู้ป่วย: {pt_name}
+โรค: {icd10_name}
+CC: {cc}
+สัญญาณชีพ
+อุณหภูมิ: {temperature}
+ชีพจร: {pulse}
+RR: {rr}
+ความดัน: {bps}/{bpd}
+เบอร์โทร {hometel} • ที่อยู่ {informaddr}',
+'flex',
+'{"version":1,"size":"mega","theme":{"primary":"#B91C1C","background":"#FFFFFF"},"blocks":[{"id":"h","type":"header","title":"🚨 แจ้งเตือนผู้ป่วยเฝ้าระวัง","subtitle":"{org_name} • {vstdate_th} {vsttime}"},{"id":"k","type":"kpi","columns":3,"cells":[{"label":"HN","value":"{hn}","tone":"muted"},{"label":"ICD-10","value":"{icd10}","tone":"danger"},{"label":"อายุ","value":"{age}","unit":"ปี","tone":"info"}]},{"id":"l","type":"list","rows":[{"label":"ชื่อผู้ป่วย","value":"{pt_name}"},{"label":"โรค","value":"{icd10_name}"}]},{"id":"n","type":"note","text":"CC: {cc}","tone":"warn"},{"id":"v","type":"list","heading":"สัญญาณชีพ","rows":[{"label":"อุณหภูมิ","value":"{temperature}"},{"label":"ชีพจร","value":"{pulse}"},{"label":"RR","value":"{rr}"},{"label":"ความดัน","value":"{bps}/{bpd}"}]},{"id":"f","type":"note","text":"เบอร์โทร {hometel} • ที่อยู่ {informaddr}","tone":"muted"}]}',
+'แจ้งเตือน CDCU: {icd10} HN {hn}',
+'["icd10","hn","org_name","vstdate_th","vsttime","age","pt_name","icd10_name","cc","temperature","pulse","rr","bps","bpd","hometel","informaddr"]',
+1);
+
+-- ALTER สำหรับ DB ที่มีอยู่แล้ว: รันคำสั่ง INSERT ด้านบนตรง ๆ ครั้งเดียวพอ
+-- (ไม่ใช่ ALTER TABLE — เป็นการเพิ่มข้อมูล ไม่ใช่โครงสร้าง)
+
+-- ============================================================
 -- Seed — system_settings default values
 -- ============================================================
 INSERT INTO `system_settings` (`setting_key`, `setting_value`, `updated_by`) VALUES

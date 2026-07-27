@@ -512,6 +512,7 @@ export default class FlexBuilderService {
               color: fg,
               align: 'center',
               margin: 'xs',
+              wrap: true,
             },
           ]
           if (cell.unit) {
@@ -549,6 +550,7 @@ export default class FlexBuilderService {
               size: 'xxs',
               color: cell.color ?? '#F0FDFA',
               align: 'center',
+              wrap: true,
             },
           ],
         })
@@ -565,6 +567,7 @@ export default class FlexBuilderService {
               weight: 'bold',
               color: cell.color ?? tone(cell.tone).fg,
               align: 'center',
+              wrap: true,
             },
             {
               type: 'text',
@@ -572,6 +575,7 @@ export default class FlexBuilderService {
               size: 'xxs',
               color: '#6B7280',
               align: 'center',
+              wrap: true,
             },
           ],
         })
@@ -605,6 +609,7 @@ export default class FlexBuilderService {
               color: row.color ?? tone(row.tone).fg,
               flex: 2,
               align: 'end',
+              wrap: true,
             },
           ],
         }))

@@ -528,10 +528,9 @@ export const CDCU_FLEX_PRESET: FlexPreset = {
       {
         id: 'k',
         type: 'kpi',
-        columns: 2,
+        columns: 3,
         cells: [
           { label: 'HN', value: '{hn}', tone: 'muted' },
-          { label: 'VN', value: '{vn}', tone: 'muted' },
           { label: 'ICD-10', value: '{icd10}', tone: 'danger' },
           { label: 'อายุ', value: '{age}', unit: 'ปี', tone: 'info' },
         ],

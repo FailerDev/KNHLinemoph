@@ -41,6 +41,30 @@ export default class ScheduleCalculator {
       return null
     }
 
+    if (mode === 'monthly') {
+      const targetDays = String(schedule.daysOfWeek ?? '')
+        .split(',')
+        .map((s) => parseInt(s.trim(), 10))
+        .filter((n) => n >= 1 && n <= 31)
+        .sort((a, b) => a - b)
+      if (targetDays.length === 0) return null
+
+      const normalTime = this.normalizeTime(sendTime)
+      const startDt = DateTime.fromISO(startDate, { zone: this.TZ })
+      if (!startDt.isValid) return null
+
+      for (let monthAdd = 0; monthAdd <= 13; monthAdd++) {
+        const base = startDt.plus({ months: monthAdd })
+        for (const targetDay of targetDays) {
+          if (targetDay > (base.daysInMonth ?? 31)) continue
+          const dateStr = `${base.year}-${String(base.month).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`
+          const candidate = DateTime.fromFormat(`${dateStr} ${normalTime}`, 'yyyy-MM-dd HH:mm:ss', { zone: this.TZ })
+          if (candidate.isValid && candidate >= minDt) return candidate
+        }
+      }
+      return null
+    }
+
     const allowed = String(schedule.daysOfWeek ?? '')
       .split(',')
       .map((s) => parseInt(s.trim(), 10))

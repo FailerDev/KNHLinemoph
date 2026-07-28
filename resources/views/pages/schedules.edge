@@ -5,19 +5,32 @@
 
     <div class="card-modern mb-4">
       <div class="card-modern-header">
-        <h2><i class="bi bi-calendar3 text-brand"></i> ตารางเวลาทั้งหมด <span class="text-muted-soft">({{ schedules.length }})</span></h2>
+        <h2><i class="bi bi-calendar3 text-brand" aria-hidden="true"></i> ตารางเวลาทั้งหมด <span class="text-muted-soft">({{ schedules.length }})</span></h2>
         <button class="btn-modern btn-brand" data-action="new-schedule">
-          <i class="bi bi-plus-lg"></i> เพิ่มตารางเวลา
+          <i class="bi bi-plus-lg" aria-hidden="true"></i> เพิ่มตารางเวลา
         </button>
+      </div>
+      <div class="card-modern-body pb-0" style="border-bottom:1px solid var(--border);">
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+          <div class="input-group" style="max-width:280px;">
+            <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
+            <input type="text" class="form-control" id="scheduleSearch" placeholder="ค้นหาชื่อตาราง..." aria-label="ค้นหาชื่อตารางเวลา">
+          </div>
+          <select class="form-select" id="scheduleStatusFilter" style="max-width:140px;" aria-label="กรองตามสถานะ">
+            <option value="">ทุกสถานะ</option>
+            <option value="active">เปิดใช้งาน</option>
+            <option value="inactive">ปิดใช้งาน</option>
+          </select>
+        </div>
       </div>
       <div class="card-modern-body" style="padding:0;">
         @if(schedules.length === 0)
           <div class="empty-state">
-            <i class="bi bi-calendar-plus"></i>
+            <i class="bi bi-calendar-plus" aria-hidden="true"></i>
             <h4>ยังไม่มีตารางเวลา</h4>
             <p>เริ่มต้นด้วยการสร้างตารางเวลาส่งข้อความอัตโนมัติ</p>
             <button class="btn-modern btn-brand" data-action="new-schedule">
-              <i class="bi bi-plus-lg"></i> สร้างตารางเวลาแรก
+              <i class="bi bi-plus-lg" aria-hidden="true"></i> สร้างตารางเวลาแรก
             </button>
           </div>
         @else
@@ -42,6 +55,8 @@
                       <strong>{{ s.name }}</strong>
                       @if(s.mode === 'specific')
                         <span class="badge-modern badge-info ms-1" title="ส่งเฉพาะวันที่ระบุ"><i class="bi bi-calendar-event"></i> วันเฉพาะ</span>
+                      @elseif(s.mode === 'monthly')
+                        <span class="badge-modern badge-info ms-1" title="ส่งทุกเดือน"><i class="bi bi-calendar-month"></i> รายเดือน</span>
                       @end
                     </td>
                     <td>
@@ -65,6 +80,12 @@
                           @end
                           @if(s.specific_dates.length > 3)
                             <span class="chip" title="ทั้งหมด {{ s.specific_dates.length }} วัน">+{{ s.specific_dates.length - 3 }}</span>
+                          @end
+                        </div>
+                      @elseif(s.mode === 'monthly')
+                        <div class="chip-list">
+                          @each(d in s.days_of_month)
+                            <span class="chip" title="ทุกวันที่ {{ d }} ของเดือน">{{ d }}</span>
                           @end
                         </div>
                       @else
@@ -93,17 +114,17 @@
                       <small class="text-muted-soft">{{ s.last_sent_date ?? '—' }}</small>
                     </td>
                     <td class="text-end">
-                      <button class="btn-modern btn-ghost btn-sm btn-icon" data-action="test-schedule" data-id="{{ s.id }}" title="ทดสอบ">
-                        <i class="bi bi-send-check"></i>
+                      <button class="btn-modern btn-ghost btn-sm btn-icon" data-action="test-schedule" data-id="{{ s.id }}" title="ทดสอบ" aria-label="ทดสอบส่ง {{ s.name }}">
+                        <i class="bi bi-send-check" aria-hidden="true"></i>
                       </button>
-                      <button class="btn-modern btn-ghost btn-sm btn-icon" data-action="clone-schedule" data-id="{{ s.id }}" title="ทำสำเนา">
-                        <i class="bi bi-files"></i>
+                      <button class="btn-modern btn-ghost btn-sm btn-icon" data-action="clone-schedule" data-id="{{ s.id }}" title="ทำสำเนา" aria-label="ทำสำเนา {{ s.name }}">
+                        <i class="bi bi-files" aria-hidden="true"></i>
                       </button>
-                      <button class="btn-modern btn-soft btn-sm btn-icon" data-action="edit-schedule" data-id="{{ s.id }}" title="แก้ไข">
-                        <i class="bi bi-pencil"></i>
+                      <button class="btn-modern btn-soft btn-sm btn-icon" data-action="edit-schedule" data-id="{{ s.id }}" title="แก้ไข" aria-label="แก้ไข {{ s.name }}">
+                        <i class="bi bi-pencil" aria-hidden="true"></i>
                       </button>
-                      <button class="btn-modern btn-danger-soft btn-sm btn-icon" data-action="delete-schedule" data-id="{{ s.id }}" title="ลบ">
-                        <i class="bi bi-trash"></i>
+                      <button class="btn-modern btn-danger-soft btn-sm btn-icon" data-action="delete-schedule" data-id="{{ s.id }}" title="ลบ" aria-label="ลบ {{ s.name }}">
+                        <i class="bi bi-trash" aria-hidden="true"></i>
                       </button>
                     </td>
                   </tr>
@@ -115,7 +136,7 @@
       </div>
     </div>
 
-    <div class="modal fade" id="scheduleModal" tabindex="-1" aria-hidden="true">
+    <div class="modal fade" id="scheduleModal" tabindex="-1" aria-hidden="true" aria-labelledby="scheduleModalTitle">
       <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <form id="scheduleForm" class="form-modern" novalidate>
@@ -123,8 +144,8 @@
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
 
             <div class="modal-header">
-              <h5 class="modal-title" id="scheduleModalTitle"><i class="bi bi-calendar3 text-brand"></i> เพิ่มตารางเวลา</h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              <h5 class="modal-title" id="scheduleModalTitle"><i class="bi bi-calendar3 text-brand" aria-hidden="true"></i> เพิ่มตารางเวลา</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
             </div>
 
             <div class="modal-body">
@@ -163,6 +184,9 @@
                     <button type="button" class="mode-toggle-btn is-active" data-mode="weekly">
                       <i class="bi bi-calendar-week"></i> ทุกสัปดาห์
                     </button>
+                    <button type="button" class="mode-toggle-btn" data-mode="monthly">
+                      <i class="bi bi-calendar-month"></i> ทุกเดือน
+                    </button>
                     <button type="button" class="mode-toggle-btn" data-mode="specific">
                       <i class="bi bi-calendar-event"></i> วันที่เฉพาะ
                     </button>
@@ -178,7 +202,7 @@
                         <button type="button" class="btn-modern btn-ghost" data-day-preset="clear">ล้าง</button>
                       </div>
                     </div>
-                    <div class="day-chips-grid">
+                    <div class="day-chips-grid" role="group" aria-label="เลือกวันในสัปดาห์ที่ต้องการส่ง">
                       @each(k in [1, 2, 3, 4, 5, 6, 7])
                         @let(isWeekend = k === 1 || k === 7)
                         <label class="day-chip {{ isWeekend ? 'is-weekend' : '' }}" title="{{ dayLong[k - 1] }}">
@@ -191,6 +215,21 @@
                     <div class="day-picker-summary is-empty" data-day-summary>
                       <i class="bi bi-info-circle"></i>
                       <span>ยังไม่ได้เลือกวัน</span>
+                    </div>
+                  </div>
+
+                  <div class="day-picker mt-2" data-mode-panel="monthly" style="display:none;">
+                    <div class="day-picker-header">
+                      <span class="text-muted-soft" style="font-size:13px;">เลือกวันที่ของเดือนที่ต้องการส่ง (ส่งทุกเดือนในวันที่เลือก)</span>
+                    </div>
+                    <div class="day-chips-grid" style="grid-template-columns:repeat(7,1fr);" role="group" aria-label="เลือกวันที่ของเดือนที่ต้องการส่ง">
+                      @each(k in [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31])
+                        <label class="day-chip">
+                          <input type="checkbox" name="days_of_month[]" value="{{ k }}">
+                          <span class="day-chip-name">{{ k }}</span>
+                          <span class="day-chip-check"><i class="bi bi-check-lg"></i></span>
+                        </label>
+                      @end
                     </div>
                   </div>
 
@@ -209,8 +248,8 @@
                 </div>
 
                 <div class="col-12">
-                  <label class="form-label">กลุ่ม LINE *</label>
-                  <div style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:8px;">
+                  <label class="form-label" id="groupListLabel">กลุ่ม LINE *</label>
+                  <div role="group" aria-labelledby="groupListLabel" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;padding:8px;">
                     @if(groups.length === 0)
                       <div class="text-muted-soft" style="padding:8px;">ยังไม่มีกลุ่ม — <a href="/groups">เพิ่มกลุ่ม</a></div>
                     @else
@@ -268,7 +307,7 @@
             <div class="modal-footer">
               <button type="button" class="btn-modern btn-soft" data-bs-dismiss="modal">ยกเลิก</button>
               <button type="submit" class="btn-modern btn-brand">
-                <i class="bi bi-check-lg"></i> บันทึก
+                <i class="bi bi-check-lg" aria-hidden="true"></i> บันทึก
               </button>
             </div>
           </form>

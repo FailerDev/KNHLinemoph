@@ -58,7 +58,7 @@ export default class NotificationSchedule extends BaseModel {
   declare daysOfWeek: string
 
   @column({ columnName: 'schedule_mode' })
-  declare scheduleMode: 'weekly' | 'specific'
+  declare scheduleMode: 'weekly' | 'specific' | 'monthly'
 
   @column({ columnName: 'specific_dates', ...jsonArrayCol })
   declare specificDates: string[]

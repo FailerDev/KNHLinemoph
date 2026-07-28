@@ -35,6 +35,9 @@ export default class SchedulesController {
         .map((n) => parseInt(n.trim(), 10))
         .filter(Boolean),
       specific_dates: s.specificDates ?? [],
+      days_of_month: s.scheduleMode === 'monthly'
+        ? String(s.daysOfWeek ?? '').split(',').map((n) => parseInt(n.trim(), 10)).filter(Boolean)
+        : [],
       repeat_enabled: !!s.repeatEnabled,
       repeat_interval: s.repeatInterval ?? null,
       repeat_unit: s.repeatUnit,
@@ -76,11 +79,13 @@ export default class SchedulesController {
         template_name: template?.templateName ?? null,
         send_time: schedule.sendTime,
         schedule_mode: schedule.scheduleMode ?? 'weekly',
-        days_of_week: schedule.daysOfWeek,
-        days_of_week_array: String(schedule.daysOfWeek ?? '')
-          .split(',')
-          .map((n) => parseInt(n.trim(), 10))
-          .filter(Boolean),
+        days_of_week: schedule.scheduleMode === 'monthly' ? '' : schedule.daysOfWeek,
+        days_of_week_array: schedule.scheduleMode === 'monthly'
+          ? []
+          : String(schedule.daysOfWeek ?? '').split(',').map((n) => parseInt(n.trim(), 10)).filter(Boolean),
+        days_of_month: schedule.scheduleMode === 'monthly'
+          ? String(schedule.daysOfWeek ?? '').split(',').map((n) => parseInt(n.trim(), 10)).filter(Boolean)
+          : [],
         specific_dates: schedule.specificDates ?? [],
         is_active: !!schedule.isActive,
         repeat_enabled: !!schedule.repeatEnabled,
@@ -110,16 +115,16 @@ export default class SchedulesController {
       return response.json({ success: false, message: msg })
     }
 
-    const mode = payload.schedule_mode === 'specific' ? 'specific' : 'weekly'
-    const daysOfWeek: number[] = Array.isArray(payload.days_of_week) ? payload.days_of_week : []
+    const mode =
+      payload.schedule_mode === 'specific' ? 'specific' :
+      payload.schedule_mode === 'monthly'  ? 'monthly'  : 'weekly'
+    const daysOfWeek: number[]   = Array.isArray(payload.days_of_week)   ? payload.days_of_week   : []
+    const daysOfMonth: number[]  = Array.isArray(payload.days_of_month)  ? payload.days_of_month  : []
     const specificDates: string[] = Array.isArray(payload.specific_dates) ? payload.specific_dates : []
 
-    if (mode === 'weekly' && daysOfWeek.length === 0) {
-      return response.json({ success: false, message: 'กรุณาเลือกวันในสัปดาห์' })
-    }
-    if (mode === 'specific' && specificDates.length === 0) {
-      return response.json({ success: false, message: 'กรุณาเลือกวันที่อย่างน้อย 1 วัน' })
-    }
+    if (mode === 'weekly'  && daysOfWeek.length === 0)   return response.json({ success: false, message: 'กรุณาเลือกวันในสัปดาห์' })
+    if (mode === 'specific' && specificDates.length === 0) return response.json({ success: false, message: 'กรุณาเลือกวันที่อย่างน้อย 1 วัน' })
+    if (mode === 'monthly'  && daysOfMonth.length === 0)  return response.json({ success: false, message: 'กรุณาเลือกวันที่ของเดือน' })
 
     const idRaw = request.input('id', null)
     const id = idRaw && !Number.isNaN(Number(idRaw)) && Number(idRaw) > 0 ? Number(idRaw) : null
@@ -133,7 +138,13 @@ export default class SchedulesController {
     schedule.groupIds = payload.group_ids
     schedule.sendTime = ScheduleCalculator.normalizeTime(payload.send_time)
     schedule.scheduleMode = mode
-    schedule.daysOfWeek = mode === 'weekly' ? daysOfWeek.join(',') : schedule.daysOfWeek || '2,3,4,5,6'
+    if (mode === 'weekly') {
+      schedule.daysOfWeek = daysOfWeek.join(',')
+    } else if (mode === 'monthly') {
+      schedule.daysOfWeek = [...daysOfMonth].sort((a, b) => a - b).join(',')
+    } else {
+      schedule.daysOfWeek = schedule.daysOfWeek || '2,3,4,5,6'
+    }
     schedule.specificDates = mode === 'specific' ? specificDates : []
     schedule.isActive = !!payload.is_active
 

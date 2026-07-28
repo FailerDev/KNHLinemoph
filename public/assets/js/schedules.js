@@ -45,6 +45,21 @@
                 if (btn) this.removeDate(btn.dataset.removeDate);
             });
 
+            // Search / filter
+            const applyFilter = () => {
+                const q = (document.getElementById('scheduleSearch')?.value || '').toLowerCase();
+                const status = document.getElementById('scheduleStatusFilter')?.value || '';
+                document.querySelectorAll('tbody tr[data-schedule-id]').forEach(tr => {
+                    const name = tr.querySelector('td strong')?.textContent?.toLowerCase() ?? '';
+                    const isActive = !!tr.querySelector('.badge-success');
+                    const matchName = !q || name.includes(q);
+                    const matchStatus = !status || (status === 'active' ? isActive : !isActive);
+                    tr.style.display = matchName && matchStatus ? '' : 'none';
+                });
+            };
+            document.getElementById('scheduleSearch')?.addEventListener('input', applyFilter);
+            document.getElementById('scheduleStatusFilter')?.addEventListener('change', applyFilter);
+
             // Action buttons (event delegation)
             document.body.addEventListener('click', e => {
                 const newBtn  = e.target.closest('[data-action="new-schedule"]');
@@ -65,18 +80,15 @@
         },
 
         setMode(mode) {
-            mode = mode === 'specific' ? 'specific' : 'weekly';
+            if (!['specific', 'monthly'].includes(mode)) mode = 'weekly';
 
-            // Update hidden input
             const hidden = this.form.querySelector('[name="schedule_mode"]');
             if (hidden) hidden.value = mode;
 
-            // Update toggle buttons
             document.querySelectorAll('[data-mode-toggle] [data-mode]').forEach(b => {
                 b.classList.toggle('is-active', b.dataset.mode === mode);
             });
 
-            // Show/hide panels
             document.querySelectorAll('[data-mode-panel]').forEach(panel => {
                 panel.style.display = panel.dataset.modePanel === mode ? '' : 'none';
             });
@@ -161,6 +173,9 @@
             this.renderDates();
             this.syncSpecificInputs();
 
+            // Reset month-day checkboxes
+            document.querySelectorAll('input[name="days_of_month[]"]').forEach(i => { i.checked = false; });
+
             // Default to weekly mode
             this.setMode('weekly');
         },
@@ -202,7 +217,13 @@
             this.specificDates = Array.isArray(d.specific_dates) ? [...d.specific_dates] : [];
             this.renderDates();
             this.syncSpecificInputs();
-            this.setMode(d.schedule_mode === 'specific' ? 'specific' : 'weekly');
+
+            // Monthly day-of-month checkboxes
+            document.querySelectorAll('input[name="days_of_month[]"]').forEach(i => {
+                i.checked = (d.days_of_month || []).includes(parseInt(i.value, 10));
+            });
+
+            this.setMode(d.schedule_mode === 'specific' ? 'specific' : d.schedule_mode === 'monthly' ? 'monthly' : 'weekly');
             this.updateTemplateVarsHint();
 
             document.getElementById('scheduleModalTitle').textContent = 'แก้ไขตารางเวลา';

@@ -508,7 +508,7 @@ export const FLEX_PRESETS: FlexPreset[] = [
 
   {
     id: 'orange-daily-bars',
-    name: 'รายงานผู้รับบริการรายวัน — ส้มดอกจาน',
+    name: 'รายงานผู้รับบริการรายวัน',
     description: 'รายงานสรุปผู้รับบริการประจำวัน หัวการ์ดไล่เฉดส้ม ตัวเลข OPD เด่น พร้อมแท่งสัดส่วนผู้ป่วยและบริการ',
     category: 'general',
     altText: 'สรุปผู้มารับบริการวันนี้ OPD {vn} ราย {date_th}',

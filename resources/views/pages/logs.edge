@@ -26,10 +26,10 @@
         <h2><i class="bi bi-funnel text-brand"></i> กรองข้อมูล</h2>
         <div class="d-flex gap-2">
           <button class="btn-modern btn-soft btn-sm" onclick="Logs.exportCSV('{{ filters.start }}', '{{ filters.end }}')">
-            <i class="bi bi-file-earmark-spreadsheet"></i> Export CSV
+            <i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i> Export CSV
           </button>
           <button class="btn-modern btn-danger-soft btn-sm" onclick="Logs.clearOld()">
-            <i class="bi bi-trash"></i> ล้างประวัติเก่า
+            <i class="bi bi-trash" aria-hidden="true"></i> ล้างประวัติเก่า
           </button>
         </div>
       </div>
@@ -63,7 +63,7 @@
             </select>
           </div>
           <div class="col-md-1 d-flex align-items-end">
-            <button type="submit" class="btn-modern btn-brand w-100"><i class="bi bi-search"></i></button>
+            <button type="submit" class="btn-modern btn-brand w-100" aria-label="ค้นหา"><i class="bi bi-search" aria-hidden="true"></i></button>
           </div>
         </form>
       </div>
@@ -111,12 +111,12 @@
                       @end
                     </td>
                     <td class="text-end">
-                      <button class="btn-modern btn-ghost btn-sm btn-icon" onclick='Logs.view({{{ JSON.stringify({ message: log.message_content, response: log.response_text }) }}})' title="ดู">
-                        <i class="bi bi-eye"></i>
+                      <button class="btn-modern btn-ghost btn-sm btn-icon" onclick='Logs.view({{{ JSON.stringify({ message: log.message_content, response: log.response_text }) }}})' title="ดู" aria-label="ดูรายละเอียดการส่ง">
+                        <i class="bi bi-eye" aria-hidden="true"></i>
                       </button>
                       @if(Number(log.status_code) !== 200 && log.group_id)
-                        <button class="btn-modern btn-warning-soft btn-sm btn-icon" onclick="Logs.resend({{ log.id }})" title="ส่งซ้ำ">
-                          <i class="bi bi-arrow-clockwise"></i>
+                        <button class="btn-modern btn-warning-soft btn-sm btn-icon" onclick="Logs.resend({{ log.id }})" title="ส่งซ้ำ" aria-label="ส่งซ้ำ">
+                          <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
                         </button>
                       @end
                     </td>

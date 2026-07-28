@@ -1,10 +1,10 @@
 {{-- Shared modals: test-send + output. Available on every page. --}}
-<div class="modal fade" id="testSendModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="testSendModal" tabindex="-1" aria-hidden="true" aria-labelledby="testSendModalTitle">
   <div class="modal-dialog modal-lg modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title"><i class="bi bi-send text-brand"></i> ส่งข้อความทดสอบ</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <h5 class="modal-title" id="testSendModalTitle"><i class="bi bi-send text-brand" aria-hidden="true"></i> ส่งข้อความทดสอบ</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
       </div>
       <div class="modal-body form-modern">
         <div class="mb-3">
@@ -22,19 +22,19 @@
       <div class="modal-footer">
         <button type="button" class="btn-modern btn-soft" data-bs-dismiss="modal">ยกเลิก</button>
         <button type="button" class="btn-modern btn-brand" onclick="App.submitTestSend()">
-          <i class="bi bi-send-check"></i> ส่ง
+          <i class="bi bi-send-check" aria-hidden="true"></i> ส่ง
         </button>
       </div>
     </div>
   </div>
 </div>
 
-<div class="modal fade" id="outputModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="outputModal" tabindex="-1" aria-hidden="true" aria-labelledby="outputModalTitle">
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="outputModalTitle"><i class="bi bi-terminal"></i> ผลลัพธ์</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <h5 class="modal-title" id="outputModalTitle"><i class="bi bi-terminal" aria-hidden="true"></i> ผลลัพธ์</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
       </div>
       <div class="modal-body">
         <pre id="outputModalContent" style="white-space:pre-wrap;background:var(--bg-muted);padding:16px;border-radius:10px;font-family:ui-monospace,monospace;font-size:13px;margin:0;"></pre>

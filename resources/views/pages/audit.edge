@@ -7,8 +7,19 @@
     })
     @let(actionLabel = {
       create: 'สร้าง', update: 'แก้ไข', delete: 'ลบ',
-      login: 'เข้าระบบ', login_failed: 'login fail', logout: 'ออกระบบ',
-      export: 'export', resend: 'ส่งซ้ำ', test_send: 'ทดสอบ', cron_run: 'cron',
+      login: 'เข้าระบบ', login_failed: 'Login Fail', logout: 'ออกระบบ',
+      export: 'Export', resend: 'ส่งซ้ำ', test_send: 'ทดสอบส่ง', cron_run: 'Cron',
+    })
+    @let(targetLabel = {
+      schedule:     'ตารางเวลา',
+      template:     'เทมเพลต',
+      item:         'รายการข้อมูล',
+      group:        'กลุ่ม LINE',
+      user:         'ผู้ใช้งาน',
+      his_database: 'HIS Database',
+      settings:     'ตั้งค่า',
+      log:          'Log',
+      cron:         'Cron',
     })
 
     <div class="card-modern mb-4">
@@ -31,7 +42,9 @@
             <select name="action_filter" class="form-select">
               <option value="">— ทั้งหมด —</option>
               @each(a in Object.keys(actionLabel))
-                <option value="{{ a }}" {{ filters.action === a ? 'selected' : '' }}>{{ a }}</option>
+                <option value="{{ a }}" {{ filters.action === a ? 'selected' : '' }}>
+                  {{ actionLabel[a] }}
+                </option>
               @end
             </select>
           </div>
@@ -39,13 +52,15 @@
             <label class="form-label">Target</label>
             <select name="target_filter" class="form-select">
               <option value="">— ทั้งหมด —</option>
-              @each(t in ['schedule','template','item','group','user','his_database','settings','log','cron'])
-                <option value="{{ t }}" {{ filters.target === t ? 'selected' : '' }}>{{ t }}</option>
+              @each(t in Object.keys(targetLabel))
+                <option value="{{ t }}" {{ filters.target === t ? 'selected' : '' }}>
+                  {{ targetLabel[t] }}
+                </option>
               @end
             </select>
           </div>
           <div class="col-md-2 d-flex align-items-end">
-            <button type="submit" class="btn-modern btn-brand w-100"><i class="bi bi-search"></i> ค้นหา</button>
+            <button type="submit" class="btn-modern btn-brand w-100"><i class="bi bi-search" aria-hidden="true"></i> ค้นหา</button>
           </div>
         </form>
       </div>
@@ -77,11 +92,12 @@
               </thead>
               <tbody>
                 @each(l in logs)
-                  @let(tone = actionTone[l.action] ?? 'neutral')
-                  @let(label = actionLabel[l.action] ?? l.action)
+                  @let(tone  = actionTone[l.action]  ?? 'neutral')
+                  @let(label = actionLabel[l.action]  ?? l.action)
+                  @let(tgt   = targetLabel[l.target_type] ?? l.target_type)
                   <tr>
                     <td>
-                      <div>{{ l.created_at.slice(5, 16) }}</div>
+                      <div style="white-space:nowrap;">{{ l.created_at.slice(11, 16) }}</div>
                       <small class="text-muted-soft">{{ l.created_at.slice(0, 10) }}</small>
                     </td>
                     <td>
@@ -94,13 +110,16 @@
                     <td><span class="badge-modern badge-{{ tone }}">{{ label }}</span></td>
                     <td>
                       @if(l.target_type)
-                        {{ l.target_type }}{{ l.target_id ? ' #' + l.target_id : '' }}
+                        <span>{{ tgt }}</span>
+                        @if(l.target_id)
+                          <small class="text-muted-soft"> #{{ l.target_id }}</small>
+                        @end
                       @else
                         <span class="text-muted-soft">—</span>
                       @end
                     </td>
                     <td><span style="font-size:13px;">{{ l.description ?? '' }}</span></td>
-                    <td><small class="text-muted-soft">{{ l.ip_address ?? '' }}</small></td>
+                    <td><small class="text-muted-soft" style="white-space:nowrap;">{{ l.ip_address ?? '' }}</small></td>
                   </tr>
                 @end
               </tbody>

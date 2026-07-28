@@ -4,12 +4,18 @@
 
     <div class="card-modern mb-4">
       <div class="card-modern-header">
-        <h2><i class="bi bi-person-gear text-brand"></i> ผู้ใช้งาน <span class="text-muted-soft">({{ users.length }})</span></h2>
+        <h2><i class="bi bi-person-gear text-brand" aria-hidden="true"></i> ผู้ใช้งาน <span class="text-muted-soft">({{ users.length }})</span></h2>
         <button class="btn-modern btn-brand" onclick="Users.openNew()">
-          <i class="bi bi-plus-lg"></i> เพิ่มผู้ใช้
+          <i class="bi bi-plus-lg" aria-hidden="true"></i> เพิ่มผู้ใช้
         </button>
       </div>
       <div class="card-modern-body" style="padding:0;">
+        <div style="padding:10px 16px;border-bottom:1px solid var(--border);">
+          <div class="input-group input-group-sm" style="max-width:320px;">
+            <span class="input-group-text" style="background:var(--bg-muted);border-color:var(--border);"><i class="bi bi-search text-muted-soft" aria-hidden="true"></i></span>
+            <input type="text" class="form-control" id="userSearch" placeholder="ค้นหาผู้ใช้..." oninput="Users.filter(this.value)" style="border-color:var(--border);" aria-label="ค้นหาผู้ใช้งาน">
+          </div>
+        </div>
         <div class="table-responsive">
           <table class="table-modern">
             <thead>
@@ -37,12 +43,12 @@
                   </td>
                   <td><small class="text-muted-soft">{{ u.last_login_at ?? '—' }}</small></td>
                   <td class="text-end">
-                    <button class="btn-modern btn-soft btn-sm btn-icon" onclick="Users.openEdit({{ u.id }})" title="แก้ไข">
-                      <i class="bi bi-pencil"></i>
+                    <button class="btn-modern btn-soft btn-sm btn-icon" onclick="Users.openEdit({{ u.id }})" title="แก้ไข" aria-label="แก้ไข {{ u.username }}">
+                      <i class="bi bi-pencil" aria-hidden="true"></i>
                     </button>
                     @if(user?.id !== u.id)
-                      <button class="btn-modern btn-danger-soft btn-sm btn-icon" onclick="Users.remove({{ u.id }})" title="ลบ">
-                        <i class="bi bi-trash"></i>
+                      <button class="btn-modern btn-danger-soft btn-sm btn-icon" onclick="Users.remove({{ u.id }})" title="ลบ" aria-label="ลบ {{ u.username }}">
+                        <i class="bi bi-trash" aria-hidden="true"></i>
                       </button>
                     @end
                   </td>
@@ -54,7 +60,7 @@
       </div>
     </div>
 
-    <div class="modal fade" id="userModal" tabindex="-1" aria-hidden="true">
+    <div class="modal fade" id="userModal" tabindex="-1" aria-hidden="true" aria-labelledby="userModalTitle">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
           <form id="userForm" class="form-modern" novalidate>
@@ -62,8 +68,8 @@
             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
 
             <div class="modal-header">
-              <h5 class="modal-title" id="userModalTitle"><i class="bi bi-person-plus text-brand"></i> เพิ่มผู้ใช้</h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              <h5 class="modal-title" id="userModalTitle"><i class="bi bi-person-plus text-brand" aria-hidden="true"></i> เพิ่มผู้ใช้</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
             </div>
 
             <div class="modal-body">
@@ -104,7 +110,7 @@
 
             <div class="modal-footer">
               <button type="button" class="btn-modern btn-soft" data-bs-dismiss="modal">ยกเลิก</button>
-              <button type="submit" class="btn-modern btn-brand"><i class="bi bi-check-lg"></i> บันทึก</button>
+              <button type="submit" class="btn-modern btn-brand"><i class="bi bi-check-lg" aria-hidden="true"></i> บันทึก</button>
             </div>
           </form>
         </div>
@@ -131,7 +137,7 @@
             f.is_active.checked = true;
             f.password.required = true;
             document.getElementById('pwdHint').textContent = '(จำเป็นสำหรับใหม่)';
-            document.getElementById('userModalTitle').innerHTML = '<i class="bi bi-person-plus text-brand"></i> เพิ่มผู้ใช้';
+            document.getElementById('userModalTitle').innerHTML = '<i class="bi bi-person-plus text-brand" aria-hidden="true"></i> เพิ่มผู้ใช้';
             this.modal.show();
           },
           async openEdit(id) {
@@ -147,7 +153,7 @@
             f.password.value = '';
             f.password.required = false;
             document.getElementById('pwdHint').textContent = '(เว้นว่างถ้าไม่เปลี่ยน)';
-            document.getElementById('userModalTitle').innerHTML = '<i class="bi bi-person-gear text-brand"></i> แก้ไขผู้ใช้';
+            document.getElementById('userModalTitle').innerHTML = '<i class="bi bi-person-gear text-brand" aria-hidden="true"></i> แก้ไขผู้ใช้';
             this.modal.show();
           },
           async save() {
@@ -158,6 +164,12 @@
               this.modal.hide();
               setTimeout(() => location.reload(), 500);
             }
+          },
+          filter(q) {
+            const s = q.trim().toLowerCase()
+            document.querySelectorAll('.table-modern tbody tr').forEach(tr => {
+              tr.style.display = !s || tr.textContent.toLowerCase().includes(s) ? '' : 'none'
+            })
           },
           async remove(id) {
             const ok = await App.confirm({ title: 'ลบผู้ใช้?', text: 'ไม่สามารถย้อนกลับได้', confirmText: 'ลบ', danger: true });

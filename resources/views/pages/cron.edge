@@ -33,16 +33,16 @@
           <div class="card-modern-header">
             <h2><i class="bi bi-terminal text-brand"></i> Cron Log</h2>
             <div class="d-flex gap-2 align-items-center">
-              <input type="date" id="logDate" value="{{ today }}" class="form-control form-control-sm" style="width:auto;">
-              <select id="logType" class="form-select form-select-sm" style="width:auto;">
+              <input type="date" id="logDate" value="{{ today }}" class="form-control form-control-sm" style="width:auto;" aria-label="เลือกวันที่ของ log">
+              <select id="logType" class="form-select form-select-sm" style="width:auto;" aria-label="กรองระดับ log">
                 <option value="info">ทั้งหมด</option>
                 <option value="error">เฉพาะ errors</option>
               </select>
-              <button class="btn-modern btn-soft btn-sm" onclick="CronView.loadLog()">
-                <i class="bi bi-arrow-clockwise"></i>
+              <button class="btn-modern btn-soft btn-sm" onclick="CronView.loadLog()" aria-label="รีเฟรช log">
+                <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
               </button>
               <button class="btn-modern btn-brand btn-sm" onclick="CronView.runNow()">
-                <i class="bi bi-play-circle"></i> รันเดี๋ยวนี้
+                <i class="bi bi-play-circle" aria-hidden="true"></i> รันเดี๋ยวนี้
               </button>
             </div>
           </div>

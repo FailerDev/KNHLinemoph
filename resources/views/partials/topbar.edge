@@ -7,7 +7,7 @@
 
 <header class="app-topbar">
   <button type="button" class="topbar-toggle icon-btn" data-sidebar-toggle aria-label="เปิดเมนู">
-    <i class="bi bi-list" style="font-size:20px;"></i>
+    <i class="bi bi-list" style="font-size:20px;" aria-hidden="true"></i>
   </button>
 
   <div class="page-title">
@@ -21,24 +21,24 @@
 
   <div class="topbar-actions">
     @if(myRank >= roleRank.operator)
-      <button type="button" class="btn-modern btn-soft btn-sm" onclick="App.runCron()">
-        <i class="bi bi-play-circle"></i>
+      <button type="button" class="btn-modern btn-soft btn-sm" onclick="App.runCron()" aria-label="รัน Cron">
+        <i class="bi bi-play-circle" aria-hidden="true"></i>
         <span class="d-none d-md-inline">รัน Cron</span>
       </button>
-      <button type="button" class="btn-modern btn-brand btn-sm" onclick="App.openTestSend()">
-        <i class="bi bi-send"></i>
+      <button type="button" class="btn-modern btn-brand btn-sm" onclick="App.openTestSend()" aria-label="ส่งทดสอบ">
+        <i class="bi bi-send" aria-hidden="true"></i>
         <span class="d-none d-md-inline">ส่งทดสอบ</span>
       </button>
     @end
 
     <button type="button" class="icon-btn" data-theme-toggle aria-label="สลับโหมด">
-      <i class="bi bi-moon"></i>
+      <i class="bi bi-moon" aria-hidden="true"></i>
     </button>
 
     @if(user)
       <div class="dropdown">
-        <button type="button" class="btn-modern btn-soft btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-          <i class="bi bi-person-circle"></i>
+        <button type="button" class="btn-modern btn-soft btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="เมนูผู้ใช้ {{ user.displayName || user.username }}">
+          <i class="bi bi-person-circle" aria-hidden="true"></i>
           <span class="d-none d-md-inline">{{ user.displayName || user.username }}</span>
         </button>
         <ul class="dropdown-menu dropdown-menu-end">
@@ -48,12 +48,12 @@
             </span>
           </li>
           <li><hr class="dropdown-divider"></li>
-          <li><a class="dropdown-item" href="/users/profile"><i class="bi bi-person"></i> โปรไฟล์</a></li>
+          <li><a class="dropdown-item" href="/users/profile"><i class="bi bi-person" aria-hidden="true"></i> โปรไฟล์</a></li>
           <li>
             <form method="POST" action="/logout" style="margin:0;">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
               <button type="submit" class="dropdown-item" style="background:transparent;border:none;width:100%;text-align:left;">
-                <i class="bi bi-box-arrow-right"></i> ออกจากระบบ
+                <i class="bi bi-box-arrow-right" aria-hidden="true"></i> ออกจากระบบ
               </button>
             </form>
           </li>

@@ -2,6 +2,7 @@ import type { HttpContext } from '@adonisjs/core/http'
 import vine from '@vinejs/vine'
 import { DateTime } from 'luxon'
 import User from '#models/user'
+import SettingsService from '#services/settings_service'
 
 const loginValidator = vine.compile(
   vine.object({
@@ -33,9 +34,14 @@ function resetLoginRateLimit(ip: string) {
 }
 
 export default class AuthController {
+  private async orgName() {
+    return SettingsService.get('org_name', 'โรงพยาบาลแก้งสนามนาง')
+  }
+
   async showLogin({ view, request }: HttpContext) {
     return view.render('pages/login', {
       username: request.input('username', ''),
+      orgName: await this.orgName(),
     })
   }
 
@@ -46,6 +52,7 @@ export default class AuthController {
       return view.render('pages/login', {
         error: 'พยายามเข้าสู่ระบบผิดพลาดบ่อยเกินไป กรุณารอ 5 นาทีแล้วลองใหม่',
         username: request.input('username', ''),
+        orgName: await this.orgName(),
       })
     }
 
@@ -56,6 +63,7 @@ export default class AuthController {
       return view.render('pages/login', {
         error: 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน',
         username: request.input('username', ''),
+        orgName: await this.orgName(),
       })
     }
 
@@ -66,6 +74,7 @@ export default class AuthController {
       return view.render('pages/login', {
         error: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง',
         username: payload.username,
+        orgName: await this.orgName(),
       })
     }
 
@@ -73,6 +82,7 @@ export default class AuthController {
       return view.render('pages/login', {
         error: 'บัญชีของคุณถูกระงับ กรุณาติดต่อผู้ดูแลระบบ',
         username: payload.username,
+        orgName: await this.orgName(),
       })
     }
 

@@ -7,7 +7,7 @@
 import edge from 'edge.js'
 import { DateTime } from 'luxon'
 
-edge.global('appName', () => 'KNH MOPH Notify System')
+edge.global('appName', () => 'MOPH Notify System')
 edge.global('appVersion', '2.2.2')
 
 edge.global('formatThaiDate', (input: string | Date | DateTime | null | undefined) => {

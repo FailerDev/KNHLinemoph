@@ -24,3 +24,9 @@ Thumbs.db
 CLAUDE.md
 pm 2
 pm2.txt
+
+# Local-only docs / context (do not push)
+PRODUCT.md
+context.md
+docs/
+.agents/

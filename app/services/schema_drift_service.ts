@@ -13,6 +13,17 @@ export interface TableDrift {
   tableMissing: boolean
 }
 
+export interface AppliedStatement {
+  statement: string
+  success: boolean
+  error?: string
+}
+
+export interface ApplyResult {
+  applied: AppliedStatement[]
+  drift: DriftResult
+}
+
 export interface DriftResult {
   /** false เมื่ออ่านไฟล์ schema.sql ไม่ได้ (เช่น deploy แล้วลืม copy) */
   available: boolean
@@ -133,6 +144,56 @@ export default class SchemaDriftService {
     }
 
     return lines.join('\n')
+  }
+
+  /**
+   * รัน ALTER TABLE ADD COLUMN จริงกับ APP DB — เฉพาะคอลัมน์ที่ "ขาดใน DB"
+   * และมีนิยามอยู่ใน schema.sql เท่านั้น ไม่มีการ DROP COLUMN หรือ CREATE TABLE
+   * จากเมธอดนี้เด็ดขาด (ตาราง/คอลัมน์เหล่านั้นยังต้องแก้ด้วยมือผ่าน SQL ที่
+   * generateAlterSql() ให้ไว้)
+   *
+   * คำนวณ drift สดใหม่ทุกครั้งจากไฟล์ schema.sql และ DB จริง ไม่รับชื่อ
+   * ตาราง/คอลัมน์จากภายนอกเข้ามาเลย — กัน endpoint นี้ถูกใช้ยิง ALTER
+   * ตามอำเภอใจ ชื่อคอลัมน์/นิยามทั้งหมดมาจาก schema.sql ที่ควบคุมอยู่ในคลังโค้ดเท่านั้น
+   *
+   * ขอบเขต: เฉพาะ APP DB (เชื่อมต่อ 'mysql' — DB_* env vars) เท่านั้น
+   * ไม่แตะ HIS DB โดยเด็ดขาด — HIS ใช้ HisManager คนละ connection กันไปเลย
+   */
+  static async applyMissingColumns(): Promise<ApplyResult> {
+    const before = await this.checkDrift()
+    if (!before.available || !before.hasDrift) {
+      return { applied: [], drift: before }
+    }
+
+    let sql: string
+    try {
+      sql = readFileSync(this.schemaPath(), 'utf8')
+    } catch {
+      return { applied: [], drift: before }
+    }
+    const definitions = parseSchemaColumnDefinitions(sql)
+
+    const applied: AppliedStatement[] = []
+    for (const t of before.tables) {
+      if (t.tableMissing) continue
+
+      const colDefs = definitions[t.table] ?? {}
+      for (const col of t.missingInDb) {
+        const def = colDefs[col]
+        if (!def) continue
+
+        const statement = `ALTER TABLE \`${t.table}\` ADD COLUMN \`${col}\` ${def}`
+        try {
+          await db.connection('mysql').rawQuery(statement)
+          applied.push({ statement, success: true })
+        } catch (err: any) {
+          applied.push({ statement, success: false, error: err?.message ?? String(err) })
+        }
+      }
+    }
+
+    const after = await this.checkDrift()
+    return { applied, drift: after }
   }
 
   static async checkDrift(): Promise<DriftResult> {

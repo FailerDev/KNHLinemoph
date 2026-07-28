@@ -113,4 +113,35 @@ export default class SettingsController {
       data: { changed },
     })
   }
+
+  /**
+   * รัน ALTER TABLE ADD COLUMN ที่ schema drift checker แนะนำ ตรงกับ APP DB
+   * เท่านั้น (ไม่แตะ HIS) — ป้องกันด้วย role admin ที่ระดับ route อยู่แล้ว
+   */
+  async applySchemaDrift(ctx: HttpContext) {
+    const { response } = ctx
+    const { applied, drift } = await SchemaDriftService.applyMissingColumns()
+    const failed = applied.filter((a) => !a.success)
+
+    if (applied.length > 0) {
+      await AuditService.record(ctx, {
+        action: 'update',
+        targetType: 'settings',
+        description: `Schema drift: applied ${applied.length} ALTER TABLE ADD COLUMN statement(s), ${failed.length} failed`,
+        afterData: applied,
+      })
+    }
+
+    return response.json({
+      success: failed.length === 0,
+      message:
+        applied.length === 0
+          ? 'ไม่มีคอลัมน์ที่เพิ่มอัตโนมัติได้ (อาจไม่มีส่วนต่าง หรือไม่พบนิยามคอลัมน์ใน schema.sql)'
+          : failed.length === 0
+            ? `เพิ่มคอลัมน์สำเร็จ ${applied.length} รายการ`
+            : `สำเร็จ ${applied.length - failed.length}/${applied.length} รายการ มีบางรายการผิดพลาด — ดูรายละเอียดด้านล่าง`,
+      applied,
+      drift,
+    })
+  }
 }

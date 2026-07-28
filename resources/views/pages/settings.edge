@@ -201,6 +201,14 @@
                     เฉพาะคอลัมน์ที่ "ขาดใน DB" เท่านั้นที่ได้คำสั่ง ADD COLUMN ให้ตรง ๆ — คอลัมน์ที่ "เกินใน DB" ได้แค่คอมเมนต์เตือน
                     เพราะการ DROP COLUMN เสี่ยงข้อมูลหายถาวร ต้องตรวจสอบเองก่อนเสมอ
                   </div>
+
+                  <button type="button" class="btn-modern btn-warning-soft btn-sm mt-2" id="schemaDriftApplyBtn">
+                    <i class="bi bi-lightning-charge" aria-hidden="true"></i> เพิ่มคอลัมน์ที่ขาดให้อัตโนมัติ (เฉพาะ ADD COLUMN)
+                  </button>
+                  <div class="flex-hint">
+                    รันจริงกับ APP DB ทันที (เฉพาะ ADD COLUMN เท่านั้น ไม่ลบ/ไม่สร้างตารางใหม่ และไม่แตะ HIS DB เด็ดขาด)
+                  </div>
+                  <div id="schemaDriftApplyResult" class="mt-2"></div>
                 @end
               @end
             </div>
@@ -495,6 +503,26 @@
             ta.select();
             App.error('คัดลอกอัตโนมัติไม่ได้', 'เลือกข้อความไว้ให้แล้ว กด Ctrl+C เอง');
           }
+        });
+
+        // Schema drift — apply missing ADD COLUMN statements to APP DB
+        document.getElementById('schemaDriftApplyBtn')?.addEventListener('click', async () => {
+          const ok = confirm(
+            'จะรัน ALTER TABLE ADD COLUMN กับ APP DB จริงทันที (เฉพาะคอลัมน์ที่ขาด ไม่ลบ/ไม่สร้างตารางใหม่ ไม่แตะ HIS DB)\n\nต้องการดำเนินการต่อหรือไม่?'
+          );
+          if (!ok) return;
+
+          const res = await App.ajax('/settings/schema-drift/apply', {});
+          const box = document.getElementById('schemaDriftApplyResult');
+          if (box && Array.isArray(res.applied)) {
+            box.innerHTML = res.applied
+              .map(a => `<div style="font-family:monospace; font-size:12px;" class="${a.success ? 'text-success' : 'text-danger'}">
+                ${a.success ? '<i class="bi bi-check-circle"></i>' : '<i class="bi bi-x-circle"></i>'} ${a.statement}${a.error ? ' — ' + a.error : ''}
+              </div>`)
+              .join('');
+          }
+          if (res.success && res.message) App.success('สำเร็จ', res.message);
+          if (res.success) setTimeout(() => location.reload(), 1200);
         });
 
         // HIS DB management (admin)

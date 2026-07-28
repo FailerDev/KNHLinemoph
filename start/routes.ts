@@ -143,6 +143,9 @@ router
     router.post('/groups/test', [GroupsController, 'test']).as('groups.test')
 
     router.post('/settings/save', [SettingsController, 'save']).as('settings.save')
+    router
+      .post('/settings/schema-drift/apply', [SettingsController, 'applySchemaDrift'])
+      .as('settings.schemaDriftApply')
 
     router.post('/hisdb/save', [HisDatabasesController, 'save']).as('hisdb.save')
     router.post('/hisdb/delete', [HisDatabasesController, 'delete']).as('hisdb.delete')

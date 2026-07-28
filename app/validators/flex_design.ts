@@ -170,6 +170,7 @@ const separatorBlock = vine.object({
 const progressBlock = vine.object({
   id: blockId,
   type: vine.literal('progress'),
+  heading: vine.string().trim().maxLength(60).optional(),
   rows: vine
     .array(
       vine.object({

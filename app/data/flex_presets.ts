@@ -505,6 +505,72 @@ export const FLEX_PRESETS: FlexPreset[] = [
       ],
     },
   },
+
+  {
+    id: 'orange-daily-bars',
+    name: 'ส้มดอกจาน — แท่งสัดส่วนผู้รับบริการรายวัน',
+    description: 'หัวการ์ดไล่เฉดส้ม ตัวเลข OPD เด่น พร้อมแท่งสัดส่วนผู้ป่วยและบริการรายวัน',
+    category: 'general',
+    altText: 'สรุปผู้มารับบริการวันนี้ OPD {vn} ราย {date_th}',
+    design: {
+      version: 1,
+      size: 'mega',
+      theme: { primary: '#EA580C', background: '#FFFFFF' },
+      blocks: [
+        {
+          id: 'h',
+          type: 'header',
+          title: '{org_name} · {date_th} · {time} น.',
+          background: { type: 'linearGradient', angle: '135deg', startColor: '#FDBA74', endColor: '#EA580C' },
+          titleColor: '#FFEDD5',
+          metricValue: '{vn}',
+          metricLabel: 'ราย (OPD วันนี้)',
+        },
+        {
+          id: 'p1',
+          type: 'progress',
+          heading: '👥 ผู้ป่วยที่มารับบริการ',
+          rows: [
+            { label: '🏥 OPD', value: '{vn}', percent: 100, color: '#EA580C' },
+            { label: '🛏️ IPD', value: '{an}', percent: 45, color: '#EA580C' },
+            { label: '🚨 ER', value: '{er}', percent: 20, color: '#EA580C' },
+            { label: '🚑 Refer', value: '{reo}', percent: 10, color: '#EA580C' },
+          ],
+        },
+        {
+          id: 'l1',
+          type: 'list',
+          heading: '🩺 บริการอื่น ๆ',
+          rows: [
+            { label: 'X-ray', value: '{xray} ราย' },
+            { label: 'ทันตกรรม', value: '{dn} ราย' },
+            { label: 'กายภาพบำบัด', value: '{ph} ราย' },
+            { label: 'แผนไทย', value: '{h1} ราย' },
+            { label: 'PCU', value: '{pcu} ราย' },
+            { label: 'ส่งเสริมสุขภาพ', value: '{pp} ราย' },
+          ],
+        },
+        { id: 'sep1', type: 'separator' },
+        {
+          id: 'l2',
+          type: 'list',
+          heading: '📊 สถานะการดำเนินงาน',
+          rows: [
+            { label: 'Lab ยืนยันแล้ว', value: '{confirmed_lab}/{total_lab} ราย' },
+            { label: 'Lab ยังไม่ยืนยัน', value: '{unconfirmed_lab} ราย', tone: 'warn' },
+            { label: 'Authen ได้/ไม่ได้', value: '{authenn} / {authen}' },
+            { label: 'ปิดสิทธิ์ Endpoint สำเร็จ/ค้าง', value: '{ep_success} / {ep_failed} ราย' },
+          ],
+        },
+        {
+          id: 'n1',
+          type: 'note',
+          tone: 'warn',
+          text: '⚠️ ยังไม่บันทึก CC/PE/PDX ทั้งหมด {total_no_cc_pe} ราย\n{no_cc_pe_list}',
+        },
+      ],
+    },
+  },
 ]
 
 /** preset สำหรับ CDCU — ใช้ตัวแปรผู้ป่วยจาก CDCU_VAR_LABELS ใน templates_controller.ts */

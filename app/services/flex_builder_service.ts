@@ -291,6 +291,7 @@ export default class FlexBuilderService {
           break
 
         case 'progress':
+          if (block.heading) lines.push(substitute(block.heading, ph))
           for (const row of block.rows ?? []) {
             lines.push(`${substitute(row.label, ph)}: ${value(row.value, ph)} (${row.percent}%)`)
           }
@@ -363,6 +364,7 @@ export default class FlexBuilderService {
           scan(block.uri)
           break
         case 'progress':
+          scan(block.heading)
           for (const row of block.rows ?? []) {
             scan(row.label)
             scan(row.value)
@@ -846,7 +848,21 @@ export default class FlexBuilderService {
         })
 
         if (rows.length === 0) return null
-        return { type: 'box', layout: 'vertical', ...BLOCK_PAD, spacing: 'sm', contents: rows }
+
+        const contents: Record<string, unknown>[] = block.heading
+          ? [
+              {
+                type: 'text',
+                text: substitute(block.heading, ph),
+                size: 'xxs',
+                weight: 'bold',
+                color: theme.primary,
+              },
+              ...rows,
+            ]
+          : rows
+
+        return { type: 'box', layout: 'vertical', ...BLOCK_PAD, spacing: 'sm', contents }
       }
 
       case 'separator': {

@@ -62,8 +62,10 @@ test.group('การ์ดสำเร็จรูป — คอมไพล์
     assert.isTrue(ALL_FLEX_PRESETS.some((p) => p.category === 'cdcu'))
   })
 
-  test('preset หมวด general มีครบ 9 ดีไซน์ตามสเปก', ({ assert }) => {
+  test('preset หมวด general มีครบ 10 ดีไซน์ (9 ตามสเปกเดิม + ส้มดอกจานแท่งสัดส่วน)', ({
+    assert,
+  }) => {
     const general = ALL_FLEX_PRESETS.filter((p) => p.category === 'general')
-    assert.lengthOf(general, 9)
+    assert.lengthOf(general, 10)
   })
 })

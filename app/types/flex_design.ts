@@ -153,6 +153,8 @@ export interface ProgressRow {
 export interface ProgressBlock {
   id: string
   type: 'progress'
+  /** หัวข้อกลุ่มเล็ก ๆ เหนือแถบ — เช่น 'ผู้ป่วยที่มารับบริการ' */
+  heading?: string
   rows: ProgressRow[]
 }
 

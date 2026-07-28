@@ -6,6 +6,7 @@ import env from '#start/env'
 import NotificationSchedule from '#models/notification_schedule'
 import NotificationService from '#services/notification_service'
 import ScheduleCalculator from '#services/schedule_calculator'
+import CdcuService from '#services/cdcu_service'
 import logger from '@adonisjs/core/services/logger'
 
 const TZ = 'Asia/Bangkok'
@@ -78,14 +79,16 @@ class CronServiceImpl {
       const currentTime = started.toFormat('HH:mm:00')
       const currentDatetime = started.toFormat('yyyy-MM-dd HH:mm:ss')
       const currentDay = ScheduleCalculator.todayDow()
+      const currentDayOfMonth = started.day
 
-      await log(`Current time: ${currentTime}, Day: ${currentDay}, Date: ${today}`)
+      await log(`Current time: ${currentTime}, Day: ${currentDay}, Date: ${today}, DayOfMonth: ${currentDayOfMonth}`)
 
       await this.step0_deactivateExpired(log, today)
       await this.step1_resetRepeatForNewDay(log, today, currentDay)
       await this.step2_initRepeatForToday(log, currentDay, today)
-      processed = await this.step3and4_processDue(log, currentTime, today, currentDay, currentDatetime)
-      await this.step5_catchMissed(log, currentDatetime, currentDay, today)
+      processed = await this.step3and4_processDue(log, currentTime, today, currentDay, currentDatetime, currentDayOfMonth)
+      await this.step5_catchMissed(log, currentDatetime, currentDay, today, currentDayOfMonth)
+      await this.stepCdcu_processPatients(log, today, currentDay)
       await this.step6_cleanOldLogs(log)
       await this.step7_performanceStats(log, today)
       await this.step8_autoBackup(log, started)
@@ -183,6 +186,17 @@ class CronServiceImpl {
             needsReset = true
             reason = newNext ? 'rolling to next date in specific_dates' : 'no future specific dates'
           }
+        } else if (mode === 'monthly') {
+          const targetDays = String(s.daysOfWeek ?? '')
+            .split(',')
+            .map((n) => parseInt(n.trim(), 10))
+            .filter((n) => n >= 1 && n <= 31)
+          const nextDom = parseInt(nextDate.slice(8, 10), 10)
+          if (nextDate < today || !targetDays.includes(nextDom)) {
+            needsReset = true
+            reason = 'monthly: stale or wrong day-of-month'
+            newNext = ScheduleCalculator.nextEligibleAt(s, today, s.sendTime, DateTime.now().setZone(TZ))
+          }
         } else {
           const days = String(s.daysOfWeek ?? '')
             .split(',')
@@ -196,23 +210,14 @@ class CronServiceImpl {
             reason = 'today is not in allowed days'
           }
           if (needsReset) {
-            // find next available day
             days.sort()
             let addDays: number | null = null
             for (const d of days) {
-              if (d > currentDay) {
-                addDays = d - currentDay
-                break
-              }
+              if (d > currentDay) { addDays = d - currentDay; break }
             }
-            if (addDays === null && days.length > 0) {
-              addDays = 7 - currentDay + days[0]
-            }
+            if (addDays === null && days.length > 0) addDays = 7 - currentDay + days[0]
             if (addDays === null) addDays = 1
-            const target = DateTime.now()
-              .setZone(TZ)
-              .plus({ days: addDays })
-              .toFormat('yyyy-MM-dd')
+            const target = DateTime.now().setZone(TZ).plus({ days: addDays }).toFormat('yyyy-MM-dd')
             newNext = DateTime.fromFormat(
               `${target} ${ScheduleCalculator.normalizeTime(s.sendTime)}`,
               'yyyy-MM-dd HH:mm:ss',
@@ -263,10 +268,11 @@ class CronServiceImpl {
         const mode = s.scheduleMode || 'weekly'
         let eligible = false
         if (mode === 'weekly') {
-          const days = String(s.daysOfWeek ?? '')
-            .split(',')
-            .map((n) => parseInt(n.trim(), 10))
+          const days = String(s.daysOfWeek ?? '').split(',').map((n) => parseInt(n.trim(), 10))
           eligible = days.includes(currentDay)
+        } else if (mode === 'monthly') {
+          const targetDays = String(s.daysOfWeek ?? '').split(',').map((n) => parseInt(n.trim(), 10)).filter((n) => n >= 1 && n <= 31)
+          eligible = targetDays.includes(DateTime.now().setZone(TZ).day)
         } else {
           eligible = (s.specificDates ?? []).includes(today)
         }
@@ -294,7 +300,8 @@ class CronServiceImpl {
     currentTime: string,
     today: string,
     currentDay: number,
-    currentDatetime: string
+    currentDatetime: string,
+    currentDayOfMonth: number
   ): Promise<number> {
     await log('STEP 3: Finding schedules due to send...')
     const todayPattern = `%"${today}"%`
@@ -316,6 +323,10 @@ class CronServiceImpl {
               q3.orWhere((q4) =>
                 q4.where('schedule_mode', 'specific').where('specific_dates', 'like', todayPattern)
               )
+              q3.orWhere((q4) =>
+                q4.where('schedule_mode', 'monthly')
+                  .whereRaw('FIND_IN_SET(?, days_of_week) > 0', [currentDayOfMonth])
+              )
             })
         })
         // REPEAT
@@ -332,6 +343,10 @@ class CronServiceImpl {
               )
               q3.orWhere((q4) =>
                 q4.where('schedule_mode', 'specific').where('specific_dates', 'like', todayPattern)
+              )
+              q3.orWhere((q4) =>
+                q4.where('schedule_mode', 'monthly')
+                  .whereRaw('FIND_IN_SET(?, days_of_week) > 0', [currentDayOfMonth])
               )
             })
             .where((q3) =>
@@ -433,7 +448,8 @@ class CronServiceImpl {
     log: (m: string, l?: CronLogEntry['level']) => Promise<void>,
     currentDatetime: string,
     currentDay: number,
-    today: string
+    today: string,
+    currentDayOfMonth: number
   ) {
     await log('STEP 5: Checking for missed repeat schedules...')
     try {
@@ -451,6 +467,10 @@ class CronServiceImpl {
           )
           q.orWhere((q2) =>
             q2.where('schedule_mode', 'specific').where('specific_dates', 'like', todayPattern)
+          )
+          q.orWhere((q2) =>
+            q2.where('schedule_mode', 'monthly')
+              .whereRaw('FIND_IN_SET(?, days_of_week) > 0', [currentDayOfMonth])
           )
         })
         .where((q) =>
@@ -481,6 +501,23 @@ class CronServiceImpl {
       }
     } catch (err: any) {
       await log(`Error checking missed schedules: ${err?.message ?? err}`, 'error')
+    }
+  }
+
+  // ============================================================
+  // STEP CDCU — scan HIS for patients matching watched ICD-10 codes
+  // ============================================================
+  private async stepCdcu_processPatients(
+    log: (m: string, l?: CronLogEntry['level']) => Promise<void>,
+    today: string,
+    currentDay: number
+  ) {
+    await log('STEP CDCU: Scanning HIS for CDCU OPD patients...')
+    try {
+      const sent = await CdcuService.runOnce(log, today, currentDay)
+      await log(sent > 0 ? `✓ CDCU: ส่งแจ้งเตือน ${sent} ครั้ง` : '✓ CDCU: ไม่มีผู้ป่วยใหม่')
+    } catch (err: any) {
+      await log(`Error in CDCU step: ${err?.message ?? err}`, 'error')
     }
   }
 
@@ -587,6 +624,7 @@ class CronServiceImpl {
         'notification_templates',
         'notification_items',
         'notification_schedules',
+        'cdcu_watch_groups',
         'users',
         'his_databases',
         'system_settings',

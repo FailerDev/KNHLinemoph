@@ -1,0 +1,293 @@
+{{--
+  คู่มือการใช้งาน — แสดงในแท็บ "คู่มือ" ของหน้าตั้งค่า (/settings#help)
+  เนื้อหาอ้างอิงพฤติกรรมจริงของ NotificationService / CronService / CdcuService
+  ถ้าเปลี่ยน logic ฝั่ง server (เช่น เพิ่มตัวแปรระบบ) ให้มาอัปเดตที่นี่ด้วย
+--}}
+<div class="manual">
+  <aside class="manual-toc" aria-label="สารบัญคู่มือ">
+    <div class="manual-search">
+      <i class="bi bi-search" aria-hidden="true"></i>
+      <input type="search" id="manualSearch" placeholder="ค้นหาในคู่มือ…" aria-label="ค้นหาในคู่มือ" autocomplete="off">
+    </div>
+    <nav>
+      <a href="#man-start"><i class="bi bi-rocket-takeoff" aria-hidden="true"></i>เริ่มต้นใช้งาน</a>
+      <a href="#man-flow"><i class="bi bi-diagram-3" aria-hidden="true"></i>ระบบทำงานอย่างไร</a>
+      <a href="#man-items"><i class="bi bi-database" aria-hidden="true"></i>รายการข้อมูล (SQL)</a>
+      <a href="#man-templates"><i class="bi bi-file-earmark-text" aria-hidden="true"></i>เทมเพลตและตัวแปร</a>
+      <a href="#man-schedules"><i class="bi bi-calendar3" aria-hidden="true"></i>ตารางเวลา</a>
+      <a href="#man-groups"><i class="bi bi-people" aria-hidden="true"></i>กลุ่ม LINE</a>
+      <a href="#man-cdcu"><i class="bi bi-virus2" aria-hidden="true"></i>CDCU เฝ้าระวังโรค</a>
+      <a href="#man-logs"><i class="bi bi-clock-history" aria-hidden="true"></i>ประวัติและการแก้ปัญหา</a>
+      <a href="#man-cron"><i class="bi bi-cpu" aria-hidden="true"></i>Cron และการตรวจสอบ</a>
+      <a href="#man-roles"><i class="bi bi-person-gear" aria-hidden="true"></i>สิทธิ์ผู้ใช้</a>
+      <a href="#man-faq"><i class="bi bi-question-circle" aria-hidden="true"></i>คำถามที่พบบ่อย</a>
+    </nav>
+  </aside>
+
+  <div class="manual-body">
+    <div class="manual-empty" id="manualEmpty" hidden>
+      <i class="bi bi-search" aria-hidden="true"></i>
+      <p>ไม่พบหัวข้อที่ตรงกับคำค้น</p>
+    </div>
+
+    {{-- ===== เริ่มต้น ===== --}}
+    <section class="manual-section" id="man-start">
+      <h3><span class="manual-ic t-green"><i class="bi bi-rocket-takeoff" aria-hidden="true"></i></span>เริ่มต้นใช้งาน</h3>
+      <p class="manual-lead">ตั้งค่าครั้งแรกตามลำดับนี้ แล้วระบบจะส่งข้อความเข้ากลุ่ม LINE ให้อัตโนมัติตามเวลาที่กำหนด</p>
+      <ol class="manual-steps">
+        <li>
+          <div><b>เชื่อมฐานข้อมูล HIS</b> <span class="badge-modern badge-danger">admin</span></div>
+          <p>ไปที่แท็บ <a href="#" data-manual-tab="#tab-database">ฐานข้อมูล</a> → HIS Databases → เพิ่ม แล้วกด <em>ทดสอบการเชื่อมต่อ</em> ให้ผ่านก่อนใช้งาน</p>
+        </li>
+        <li>
+          <div><b>เพิ่มกลุ่ม LINE</b> <span class="badge-modern badge-danger">admin</span></div>
+          <p>หน้า <a href="/groups">กลุ่ม LINE</a> → กรอก Client Key / Secret Key ของกลุ่ม แล้วกดปุ่มส่งทดสอบเพื่อยืนยันว่ากลุ่มรับข้อความได้</p>
+        </li>
+        <li>
+          <div><b>สร้างรายการข้อมูล (SQL)</b> <span class="badge-modern badge-warning">operator</span></div>
+          <p>หน้า <a href="/items">รายการข้อมูล</a> → เขียน SQL ที่ดึงตัวเลข/ข้อมูลจาก HIS แล้วกด <em>ทดสอบ</em> ดูผลลัพธ์ก่อนบันทึก</p>
+        </li>
+        <li>
+          <div><b>สร้างเทมเพลตข้อความ</b> <span class="badge-modern badge-warning">operator</span></div>
+          <p>หน้า <a href="/templates">เทมเพลตข้อความ</a> → พิมพ์ข้อความและแทรกตัวแปร เช่น <code>{date_th}</code> หรือรหัสของรายการข้อมูล</p>
+        </li>
+        <li>
+          <div><b>สร้างตารางเวลา</b> <span class="badge-modern badge-warning">operator</span></div>
+          <p>หน้า <a href="/schedules">ตารางเวลา</a> → เลือกเทมเพลต กลุ่ม LINE เวลา และวันที่ต้องการส่ง แล้วกด <em>ส่งทดสอบ</em> หนึ่งครั้งเพื่อดูผลจริง</p>
+        </li>
+      </ol>
+      <div class="callout callout-tip">
+        <i class="bi bi-lightbulb" aria-hidden="true"></i>
+        <div>เมื่อทำครบ 5 ขั้นตอน ไม่ต้องเปิดหน้าเว็บค้างไว้ — server ตรวจตารางเวลาทุก 1 นาทีและส่งให้เอง ดูสถานะได้ที่กล่อง <b>Cron</b> มุมล่างซ้ายของเมนู</div>
+      </div>
+    </section>
+
+    {{-- ===== Flow ===== --}}
+    <section class="manual-section" id="man-flow">
+      <h3><span class="manual-ic t-teal"><i class="bi bi-diagram-3" aria-hidden="true"></i></span>ระบบทำงานอย่างไร</h3>
+      <div class="manual-flow" role="list">
+        <div class="flow-node" role="listitem"><i class="bi bi-alarm" aria-hidden="true"></i><b>ถึงเวลาส่ง</b><span>Cron ตรวจทุกนาที</span></div>
+        <i class="bi bi-chevron-right flow-arrow" aria-hidden="true"></i>
+        <div class="flow-node" role="listitem"><i class="bi bi-file-earmark-text" aria-hidden="true"></i><b>อ่านเทมเพลต</b><span>หา <code>{ตัวแปร}</code> ที่ใช้</span></div>
+        <i class="bi bi-chevron-right flow-arrow" aria-hidden="true"></i>
+        <div class="flow-node" role="listitem"><i class="bi bi-database" aria-hidden="true"></i><b>รัน SQL</b><span>ดึงข้อมูลจาก HIS</span></div>
+        <i class="bi bi-chevron-right flow-arrow" aria-hidden="true"></i>
+        <div class="flow-node" role="listitem"><i class="bi bi-send" aria-hidden="true"></i><b>ส่งเข้ากลุ่ม</b><span>ทุกกลุ่มที่เลือก</span></div>
+        <i class="bi bi-chevron-right flow-arrow" aria-hidden="true"></i>
+        <div class="flow-node" role="listitem"><i class="bi bi-journal-check" aria-hidden="true"></i><b>บันทึกประวัติ</b><span>1 แถวต่อ 1 กลุ่ม</span></div>
+      </div>
+      <p>ตารางเวลา <b>ไม่ต้องเลือกรายการข้อมูลเอง</b> — ระบบดูจากตัวแปรในเทมเพลตว่าใช้รายการไหน แล้วรัน SQL ของรายการนั้นให้อัตโนมัติ</p>
+    </section>
+
+    {{-- ===== Items ===== --}}
+    <section class="manual-section" id="man-items">
+      <h3><span class="manual-ic t-slate"><i class="bi bi-database" aria-hidden="true"></i></span>รายการข้อมูล (SQL)</h3>
+      <p>แต่ละรายการคือ SQL หนึ่งชุดที่รันบนฐานข้อมูล HIS มี <b>รหัส (key)</b> ที่ใช้เรียกในเทมเพลต เช่น รหัส <code>opd_total</code> → ใช้ในเทมเพลตเป็น <code>{opd_total}</code></p>
+      <ul class="manual-list">
+        <li>ใช้ <code>{date}</code> ใน SQL แทนวันที่วันนี้ (รูปแบบ <code>YYYY-MM-DD</code>)</li>
+        <li>ใช้เฉพาะคำสั่งอ่านข้อมูล (<code>SELECT</code>) — แนะนำให้ใช้บัญชี HIS ที่มีสิทธิ์อ่านอย่างเดียว เพื่อกันการแก้ไขข้อมูลโดยไม่ตั้งใจ</li>
+      </ul>
+      <h4>รูปแบบผลลัพธ์</h4>
+      <div class="manual-cards">
+        <div class="manual-card">
+          <b><i class="bi bi-1-square" aria-hidden="true"></i> แถวเดียว</b>
+          <p>SQL คืน 1 แถว ทุกคอลัมน์ใช้เป็นตัวแปรได้ตามชื่อคอลัมน์ ถ้ามีคอลัมน์เดียว ใช้ <code>{รหัสรายการ}</code> ได้ด้วย</p>
+          <pre class="manual-code">SELECT COUNT(*) AS opd_total
+FROM ovst WHERE vstdate = '{date}'</pre>
+        </div>
+        <div class="manual-card">
+          <b><i class="bi bi-list-ul" aria-hidden="true"></i> หลายแถว → ข้อความ</b>
+          <p>แต่ละแถวถูกจัดตาม <em>Row Template</em> แล้วต่อกันด้วยตัวคั่น ได้เป็นข้อความเดียวใน <code>{รหัสรายการ}</code></p>
+          <pre class="manual-code">Row Template:
+{dep_name}: {cnt} ราย</pre>
+        </div>
+        <div class="manual-card">
+          <b><i class="bi bi-table" aria-hidden="true"></i> หลายแถว → ตาราง Flex</b>
+          <p>ใช้กับบล็อก <em>ตาราง</em> ในเทมเพลตแบบ Flex เลือกรายการนี้แล้วจับคู่คอลัมน์ได้เลย ไม่ต้องเขียน Row Template</p>
+        </div>
+      </div>
+      <div class="callout callout-warn">
+        <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+        <div>ถ้า SQL ผิดหรือต่อ HIS ไม่ได้ ตัวแปรของรายการนั้นจะแสดงเป็น <code>ERROR</code> ในข้อความ — กด <em>ทดสอบ</em> ที่หน้ารายการข้อมูลเพื่อดูสาเหตุ</div>
+      </div>
+    </section>
+
+    {{-- ===== Templates ===== --}}
+    <section class="manual-section" id="man-templates">
+      <h3><span class="manual-ic t-violet"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></span>เทมเพลตและตัวแปร</h3>
+      <p>เทมเพลตมี 2 แบบ: <b>ข้อความธรรมดา</b> และ <b>Flex Message</b> (การ์ดสวยงาม มีหัวข้อ ตาราง ปุ่ม — สร้างได้จากตัวช่วยออกแบบโดยไม่ต้องเขียนโค้ด)</p>
+      <h4>ตัวแปรระบบ (ใช้ได้ทุกเทมเพลต)</h4>
+      <div class="table-responsive">
+        <table class="table-modern manual-table">
+          <thead><tr><th>ตัวแปร</th><th>ความหมาย</th><th>ตัวอย่าง</th></tr></thead>
+          <tbody>
+            <tr><td><code>{date}</code></td><td>วันที่</td><td>2026-10-07</td></tr>
+            <tr><td><code>{date_th}</code></td><td>วันที่ภาษาไทย</td><td>7 ตุลาคม 2569</td></tr>
+            <tr><td><code>{weekday}</code></td><td>วันในสัปดาห์</td><td>วันพุธ</td></tr>
+            <tr><td><code>{time}</code></td><td>เวลาที่ส่ง</td><td>08:00:00</td></tr>
+            <tr><td><code>{org_name}</code></td><td>ชื่อหน่วยงาน (ตั้งค่า → ข้อมูลทั่วไป)</td><td>{{ orgName }}</td></tr>
+            <tr><td><code>{site_title}</code></td><td>หัวข้อหลักของระบบ</td><td>{{ siteTitle || appName() }}</td></tr>
+            <tr><td><code>{site_footer}</code></td><td>ข้อความท้าย</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h4>ตัวอย่างเทมเพลต</h4>
+      <div class="manual-example">
+        <pre class="manual-code">📊 สรุปผู้ป่วยนอก {date_th}
+🏥 {org_name}
+
+ผู้ป่วยนอกทั้งหมด: {opd_total} ราย
+{dep_summary}</pre>
+        <i class="bi bi-arrow-right manual-example-arrow" aria-hidden="true"></i>
+        <div class="manual-bubble">📊 สรุปผู้ป่วยนอก 7 ตุลาคม 2569<br>🏥 {{ orgName }}<br><br>ผู้ป่วยนอกทั้งหมด: 412 ราย<br>อายุรกรรม: 120 ราย<br>ศัลยกรรม: 85 ราย</div>
+      </div>
+      <div class="callout callout-tip">
+        <i class="bi bi-lightbulb" aria-hidden="true"></i>
+        <div>ในหน้าแก้ไขเทมเพลต คลิกชื่อตัวแปรเพื่อแทรกลงในข้อความได้ทันที และระบบจะเตือนถ้าพิมพ์ชื่อตัวแปรที่ไม่มีอยู่จริง</div>
+      </div>
+    </section>
+
+    {{-- ===== Schedules ===== --}}
+    <section class="manual-section" id="man-schedules">
+      <h3><span class="manual-ic t-green"><i class="bi bi-calendar3" aria-hidden="true"></i></span>ตารางเวลา</h3>
+      <div class="manual-cards">
+        <div class="manual-card">
+          <b><i class="bi bi-calendar-week" aria-hidden="true"></i> ทุกสัปดาห์</b>
+          <p>เลือกวันในสัปดาห์ (มีปุ่มลัด จ–ศ / ส–อา / ทุกวัน) ส่งตามเวลาที่ตั้งทุกสัปดาห์</p>
+        </div>
+        <div class="manual-card">
+          <b><i class="bi bi-calendar-event" aria-hidden="true"></i> วันเฉพาะ</b>
+          <p>ระบุวันที่ทีละวัน เหมาะกับงานครั้งเดียว เมื่อผ่านวันสุดท้ายแล้วระบบจะปิดตารางเวลานี้ให้อัตโนมัติ</p>
+        </div>
+        <div class="manual-card">
+          <b><i class="bi bi-calendar-month" aria-hidden="true"></i> รายเดือน</b>
+          <p>เลือกวันที่ของเดือน (1–31) ถ้าเดือนนั้นไม่มีวันที่เลือก เช่น 31 ในเดือนกันยายน จะข้ามไป</p>
+        </div>
+      </div>
+      <h4>ส่งซ้ำ (Repeat)</h4>
+      <p>เปิด <em>ส่งซ้ำ</em> เพื่อส่งหลายรอบในวันเดียว เช่น เริ่ม 08:00 <b>ทุก ๆ 1 ชั่วโมง</b> จนถึง 16:00 → ส่ง 08:00, 09:00, … 16:00</p>
+      <ul class="manual-list">
+        <li>ตารางเวลาที่ <b>ไม่</b> ส่งซ้ำ จะส่ง <b>วันละ 1 ครั้ง</b> — ถ้าส่งไปแล้ววันนี้ cron จะไม่ส่งซ้ำแม้กดรัน Cron อีก</li>
+        <li>ถ้า server ปิดไปช่วงเวลาส่ง ระบบจะส่งย้อนให้เมื่อกลับมาทำงานในวันเดียวกัน</li>
+        <li>ปุ่ม <i class="bi bi-send" aria-hidden="true"></i> <b>ส่งทดสอบ</b> ในตาราง ส่งทันทีโดยไม่สนวัน/เวลา (ใช้ตรวจหน้าตาข้อความ)</li>
+        <li>ปิดสวิตช์ <b>เปิดใช้งาน</b> ในหน้าแก้ไข เพื่อหยุดชั่วคราวโดยไม่ต้องลบ</li>
+      </ul>
+    </section>
+
+    {{-- ===== Groups ===== --}}
+    <section class="manual-section" id="man-groups">
+      <h3><span class="manual-ic t-sky"><i class="bi bi-people" aria-hidden="true"></i></span>กลุ่ม LINE</h3>
+      <p>แต่ละกลุ่มใช้ <b>Client Key</b> และ <b>Secret Key</b> ที่ได้จากบริการ MOPH Notify ของกลุ่มนั้น API URL ใช้ค่าเริ่มต้นจากหน้าตั้งค่าได้เลย</p>
+      <ul class="manual-list">
+        <li>กดไอคอน <i class="bi bi-send" aria-hidden="true"></i> <b>ทดสอบส่ง</b> ในแถวของกลุ่ม หรือปุ่ม <b>ส่งทดสอบ</b> บนแถบด้านบน เพื่อตรวจว่า key ใช้งานได้</li>
+        <li>ปิดใช้งานกลุ่มเมื่อไม่ต้องการให้รับข้อความชั่วคราว — ตารางเวลาที่ผูกไว้จะข้ามกลุ่มนี้</li>
+      </ul>
+    </section>
+
+    {{-- ===== CDCU ===== --}}
+    <section class="manual-section" id="man-cdcu">
+      <h3><span class="manual-ic t-rose"><i class="bi bi-virus2" aria-hidden="true"></i></span>CDCU เฝ้าระวังโรค</h3>
+      <p>แจ้งเตือนทันทีเมื่อมีผู้ป่วยที่ได้รับการวินิจฉัยด้วยรหัส ICD-10 ที่เฝ้าระวัง ไม่ต้องตั้งเวลา</p>
+      <ol class="manual-steps manual-steps-compact">
+        <li><div><b>สร้างกลุ่มเฝ้าระวัง</b></div><p>ตั้งชื่อ ใส่รหัส ICD-10 (หลายรหัสได้) เลือก HIS Database และกลุ่ม LINE ที่จะรับแจ้งเตือน</p></li>
+        <li><div><b>เลือกวันที่ทำงานและเทมเพลต</b></div><p>ใช้ตัวแปรผู้ป่วย เช่น <code>{hn}</code> <code>{pt_name}</code> <code>{age}</code> <code>{icd10}</code> <code>{icd10_name}</code> <code>{vstdate_th}</code> และสัญญาณชีพ</p></li>
+        <li><div><b>เปิดใช้งาน</b></div><p>ระบบตรวจทุก 1 นาที ตลอดวัน และส่งทันทีที่พบผู้ป่วยตรงเงื่อนไข</p></li>
+      </ol>
+      <ul class="manual-list">
+        <li>ผู้ป่วยรายเดิม (VN + ICD-10 เดิม) จะถูกแจ้ง <b>ครั้งเดียวต่อวัน</b> ไม่ส่งซ้ำ</li>
+        <li>เปิด <b>เข้ารหัสชื่อ</b> เพื่อซ่อนชื่อผู้ป่วยบางส่วนในข้อความ (เช่น นายxxxทดสอบ) ลดความเสี่ยงข้อมูลส่วนบุคคล</li>
+      </ul>
+    </section>
+
+    {{-- ===== Logs ===== --}}
+    <section class="manual-section" id="man-logs">
+      <h3><span class="manual-ic t-amber"><i class="bi bi-clock-history" aria-hidden="true"></i></span>ประวัติและการแก้ปัญหา</h3>
+      <p>หน้า <a href="/logs">ประวัติการส่ง</a> เก็บทุกการส่ง (1 แถวต่อกลุ่ม) กรองตามวันที่ ตารางเวลา และสถานะได้ กดไอคอน <i class="bi bi-eye" aria-hidden="true"></i> เพื่อดูข้อความและคำตอบจาก server ปลายทาง</p>
+      <div class="table-responsive">
+        <table class="table-modern manual-table">
+          <thead><tr><th>สิ่งที่เห็น</th><th>สาเหตุที่พบบ่อย</th><th>วิธีแก้</th></tr></thead>
+          <tbody>
+            <tr><td><span class="badge-modern badge-success">200</span></td><td>ส่งสำเร็จ</td><td>—</td></tr>
+            <tr><td><span class="badge-modern badge-danger">401 / 403</span></td><td>Client Key / Secret Key ผิดหรือหมดอายุ</td><td>แก้ key ที่หน้ากลุ่ม LINE แล้วกดส่งทดสอบ</td></tr>
+            <tr><td><span class="badge-modern badge-danger">400</span></td><td>ข้อความว่าง หรือรูปแบบข้อความ/Flex ไม่ถูกต้อง</td><td>เปิดดูตัวอย่างในหน้าเทมเพลต ลดความยาวหรือจำนวนแถวในตาราง</td></tr>
+            <tr><td><span class="badge-modern badge-danger">0 / timeout</span></td><td>server ออกอินเทอร์เน็ตไม่ได้ หรือปลายทางไม่ตอบ (ระบบลองส่งใหม่ให้อัตโนมัติแล้ว)</td><td>ตรวจเครือข่ายของ server แล้วกด <b>ส่งซ้ำ</b></td></tr>
+            <tr><td><code>ERROR</code> ในข้อความ</td><td>SQL ของรายการข้อมูลผิด หรือต่อ HIS ไม่ได้</td><td>ทดสอบรายการข้อมูล / ทดสอบการเชื่อมต่อ HIS</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul class="manual-list">
+        <li>รายการที่ล้มเหลวมีปุ่ม <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> <b>ส่งซ้ำ</b> ใช้ข้อความเดิมส่งไปกลุ่มเดิม</li>
+        <li><b>Export CSV</b> ส่งออกตามตัวกรองที่เลือก เปิดใน Excel ได้ภาษาไทยถูกต้อง</li>
+        <li>ประวัติเก่าถูกลบอัตโนมัติตามค่า <code>MAX_LOG_DAYS</code> และลบเองได้ด้วยปุ่ม <b>ล้างประวัติเก่า</b></li>
+      </ul>
+    </section>
+
+    {{-- ===== Cron ===== --}}
+    <section class="manual-section" id="man-cron">
+      <h3><span class="manual-ic t-teal"><i class="bi bi-cpu" aria-hidden="true"></i></span>Cron และการตรวจสอบระบบ</h3>
+      <div class="manual-cards">
+        <div class="manual-card">
+          <b><i class="bi bi-activity" aria-hidden="true"></i> สถานะ</b>
+          <p>กล่องมุมล่างซ้ายของเมนู: <span class="status-dot is-online d-inline-block" aria-hidden="true"></span> ทำงานปกติ · <span class="status-dot is-offline d-inline-block" aria-hidden="true"></span> ไม่ตอบสนองเกิน 90 วินาที (ควรตรวจ server)</p>
+        </div>
+        <div class="manual-card">
+          <b><i class="bi bi-play-circle" aria-hidden="true"></i> รัน Cron ทันที</b>
+          <p>ปุ่ม <em>รัน Cron</em> บนแถบด้านบน สั่งตรวจรอบเดียวทันที — ใช้เมื่ออยากให้รายการที่ถึงเวลาแล้วส่งเลย</p>
+        </div>
+        <div class="manual-card">
+          <b><i class="bi bi-heart-pulse" aria-hidden="true"></i> Health check</b>
+          <p>ให้ระบบ monitor เรียก <code>/health</code> เพื่อตรวจว่า server ยังทำงาน</p>
+        </div>
+      </div>
+      <ul class="manual-list">
+        <li>ดู log รายนาทีได้ที่หน้า <a href="/cron">การทำงาน Cron</a> (operator ขึ้นไป)</li>
+        <li>ทุกวันเวลา 23:00 ระบบสำรองฐานข้อมูลของแอปไว้ในโฟลเดอร์ <code>backups/</code> (เก็บ 30 วันล่าสุด)</li>
+        <li>ผู้ดูแล server: ระบบรันด้วย PM2 จึงทำงานต่อแม้ปิดเบราว์เซอร์ — สั่งรันเองได้ด้วย <code>node ace cron:run</code></li>
+      </ul>
+    </section>
+
+    {{-- ===== Roles ===== --}}
+    <section class="manual-section" id="man-roles">
+      <h3><span class="manual-ic t-slate"><i class="bi bi-person-gear" aria-hidden="true"></i></span>สิทธิ์ผู้ใช้</h3>
+      <div class="table-responsive">
+        <table class="table-modern manual-table manual-roles">
+          <thead><tr><th>ทำอะไรได้</th><th>ผู้ดู<br><small>viewer</small></th><th>ผู้ปฏิบัติงาน<br><small>operator</small></th><th>ผู้ดูแลระบบ<br><small>admin</small></th></tr></thead>
+          <tbody>
+            <tr><td>ดูแดชบอร์ด ตารางเวลา เทมเพลต ประวัติ</td><td><i class="bi bi-check-lg yes" aria-label="ได้"></i></td><td><i class="bi bi-check-lg yes" aria-label="ได้"></i></td><td><i class="bi bi-check-lg yes" aria-label="ได้"></i></td></tr>
+            <tr><td>สร้าง/แก้ ตารางเวลา เทมเพลต รายการข้อมูล</td><td><i class="bi bi-dash no" aria-label="ไม่ได้"></i></td><td><i class="bi bi-check-lg yes" aria-label="ได้"></i></td><td><i class="bi bi-check-lg yes" aria-label="ได้"></i></td></tr>
+            <tr><td>ส่งทดสอบ รัน Cron จัดการ CDCU</td><td><i class="bi bi-dash no" aria-label="ไม่ได้"></i></td><td><i class="bi bi-check-lg yes" aria-label="ได้"></i></td><td><i class="bi bi-check-lg yes" aria-label="ได้"></i></td></tr>
+            <tr><td>จัดการกลุ่ม LINE, HIS Database, ผู้ใช้, ตั้งค่าระบบ, ประวัติการแก้ไข</td><td><i class="bi bi-dash no" aria-label="ไม่ได้"></i></td><td><i class="bi bi-dash no" aria-label="ไม่ได้"></i></td><td><i class="bi bi-check-lg yes" aria-label="ได้"></i></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="mt-3">ทุกคนเปลี่ยนรหัสผ่านของตัวเองได้ที่ <a href="/users/profile">โปรไฟล์</a> (เมนูชื่อผู้ใช้มุมขวาบน)</p>
+    </section>
+
+    {{-- ===== FAQ ===== --}}
+    <section class="manual-section" id="man-faq">
+      <h3><span class="manual-ic t-amber"><i class="bi bi-question-circle" aria-hidden="true"></i></span>คำถามที่พบบ่อย</h3>
+      <div class="manual-faq">
+        <details>
+          <summary>ถึงเวลาแล้วแต่ข้อความไม่ส่ง?</summary>
+          <p>ตรวจตามลำดับ: (1) ตารางเวลาเปิดใช้งานอยู่และวันนี้อยู่ในวันที่เลือก (2) วันนี้ยังไม่เคยส่ง — ดูคอลัมน์ <em>ส่งล่าสุด</em> (3) กล่องสถานะ Cron เป็นสีเขียว (4) ดูหน้าประวัติการส่งว่ามีรายการล้มเหลวหรือไม่</p>
+        </details>
+        <details>
+          <summary>อยากส่งข้อความเดิมอีกครั้งในวันเดียวกัน?</summary>
+          <p>ใช้ปุ่ม <b>ส่งทดสอบ</b> ในหน้าตารางเวลา (ส่งทันทีไม่สนเงื่อนไข) หรือปุ่ม <b>ส่งซ้ำ</b> ในหน้าประวัติสำหรับรายการที่ล้มเหลว</p>
+        </details>
+        <details>
+          <summary>ตัวเลขในข้อความเป็น 0 ทั้งที่ควรมีข้อมูล?</summary>
+          <p>SQL คืนค่าว่าง (NULL) ระบบจะแสดงเป็น 0 — ลองกดทดสอบรายการข้อมูล และตรวจเงื่อนไขวันที่ <code>{date}</code> ใน SQL</p>
+        </details>
+        <details>
+          <summary>ต้องเปิดเว็บทิ้งไว้ไหม?</summary>
+          <p>ไม่ต้อง ระบบส่งจาก server โดยตรง ปิดเบราว์เซอร์ได้เลย</p>
+        </details>
+        <details>
+          <summary>แก้ชื่อระบบ/ชื่อหน่วยงานที่แสดงด้านบนได้ที่ไหน?</summary>
+          <p>แท็บ <a href="#" data-manual-tab="#tab-general">ข้อมูลทั่วไป</a> → หัวข้อหลัก และชื่อหน่วยงาน (admin) — ค่าเหล่านี้ใช้เป็นตัวแปร <code>{site_title}</code> และ <code>{org_name}</code> ในข้อความด้วย</p>
+        </details>
+      </div>
+    </section>
+  </div>
+</div>

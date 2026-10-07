@@ -217,7 +217,7 @@
 
         <div class="card-modern">
           <div class="card-modern-header">
-            <h2><i class="bi bi-database-fill text-brand"></i> HIS Databases <span class="text-muted-soft">({{ hisDbs.length }})</span></h2>
+            <h2><i class="bi bi-database-fill text-brand"></i> HIS Databases <span class="text-muted-soft">{{ hisDbs.length }}</span></h2>
             @if(isAdmin)
               <button class="btn-modern btn-brand" onclick="HisDB.openNew()">
                 <i class="bi bi-plus-lg" aria-hidden="true"></i> เพิ่ม HIS
@@ -346,54 +346,7 @@
 
       {{-- Help --}}
       <div class="tab-pane fade" id="tab-help" role="tabpanel" aria-labelledby="tab-help-btn" tabindex="0">
-        <div class="card-modern">
-          <div class="card-modern-header"><h2><i class="bi bi-book text-brand"></i> คู่มือการใช้งาน</h2></div>
-          <div class="card-modern-body">
-            <div class="row g-3">
-              <div class="col-md-6">
-                <div style="padding:16px;background:var(--bg-muted);border-radius:12px;height:100%;">
-                  <h5><i class="bi bi-1-circle-fill text-brand"></i> เริ่มต้น</h5>
-                  <ol style="font-size:14px;padding-left:20px;">
-                    <li>เพิ่ม HIS Database ที่จะดึงข้อมูล (admin)</li>
-                    <li>เพิ่มกลุ่ม LINE ที่จะส่งข้อความ (admin)</li>
-                    <li>เพิ่มรายการข้อมูล (SQL query) (operator)</li>
-                    <li>เพิ่มเทมเพลตข้อความที่ใช้ตัวแปร</li>
-                    <li>สร้างตารางเวลา</li>
-                  </ol>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div style="padding:16px;background:var(--bg-muted);border-radius:12px;height:100%;">
-                  <h5><i class="bi bi-2-circle-fill text-brand"></i> Cron (Phase 6)</h5>
-                  <p style="font-size:14px;">In-process scheduler (node-cron) ทำงานในตัว server</p>
-                  <ul style="font-size:14px;padding-left:20px;">
-                    <li>CLI: <code>npm run cron:run</code></li>
-                    <li>Auto: เมื่อ <code>npm run dev</code> รันอยู่ scheduler tick ทุกนาที</li>
-                  </ul>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div style="padding:16px;background:var(--bg-muted);border-radius:12px;height:100%;">
-                  <h5><i class="bi bi-3-circle-fill text-brand"></i> สิทธิ์ผู้ใช้</h5>
-                  <ul style="font-size:14px;padding-left:20px;">
-                    <li><strong>admin</strong> — เต็มสิทธิ์ จัดการผู้ใช้/HIS DB/กลุ่ม LINE</li>
-                    <li><strong>operator</strong> — จัดการ schedule/template/item รัน cron</li>
-                    <li><strong>viewer</strong> — ดูอย่างเดียว</li>
-                  </ul>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div style="padding:16px;background:var(--bg-muted);border-radius:12px;height:100%;">
-                  <h5><i class="bi bi-4-circle-fill text-brand"></i> Health Check</h5>
-                  <p style="font-size:14px;">URL สำหรับ uptime monitor:</p>
-                  <code style="display:block;padding:8px;background:var(--bg-elevated);border-radius:6px;font-size:12px;">
-                    /health
-                  </code>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        @include('partials/manual')
       </div>
 
     </div>

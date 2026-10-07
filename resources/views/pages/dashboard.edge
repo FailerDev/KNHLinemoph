@@ -1,193 +1,310 @@
 @component('layouts/app', { title: 'แดชบอร์ด' })
   @slot('main')
     @let(dayShort = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'])
-    @let(rateTone = stats.success_rate >= 90 ? 'tone-brand' : (stats.success_rate >= 70 ? 'tone-warning' : 'tone-danger'))
+    @let(weekOrder = [2, 3, 4, 5, 6, 7, 1])
+    @let(rateTone = stats.success_rate >= 90 ? 'tone-success' : (stats.success_rate >= 70 ? 'tone-warning' : 'tone-danger'))
+    @let(rowTones = ['t-green', 't-sky', 't-violet', 't-amber', 't-teal', 't-rose', 't-slate'])
+    @let(todayDom = parseInt(today.slice(8), 10))
+    @let(roleRank = { viewer: 1, operator: 2, admin: 3 })
+    @let(myRank = roleRank[user?.role] ?? 0)
+    @let(weekMax = Math.max(1, ...weeklyStats.map(r => r.total)))
+    @let(weekTotal = weeklyStats.reduce((a, r) => a + r.total, 0))
+    @let(weekFailed = weeklyStats.reduce((a, r) => a + (r.total - r.success), 0))
+    @let(isToday = (s) => (s.mode === 'weekly' && s.days.includes(todayDow)) || (s.mode === 'monthly' && s.days.includes(todayDom)))
+    @let(todayCount = todaySchedules.filter(s => isToday(s)).length)
+    @let(repeatCount = todaySchedules.filter(s => s.repeat_enabled).length)
+    @let(untilLabel = (m) => m < 60 ? `อีก ${m} นาที` : `อีก ${Math.floor(m / 60)} ชม.${m % 60 ? ' ' + (m % 60) + ' นาที' : ''}`)
 
-    <section class="stat-grid mb-4">
-      <div class="stat-card">
-        <p class="stat-label">ตารางเวลาที่ใช้งาน</p>
-        <p class="stat-value">{{ stats.active_schedules }}</p>
-        <span class="stat-trend flat"><i class="bi bi-calendar-check"></i> active</span>
-        <div class="stat-icon tone-brand"><i class="bi bi-calendar3"></i></div>
+    {{-- ===== Hero ===== --}}
+    <section class="hero">
+      <div class="hero-text">
+        <span class="hero-eyebrow"><i class="bi bi-calendar-event" aria-hidden="true"></i>{{ todayLabel }}</span>
+        <h2>ภาพรวมการแจ้งเตือนวันนี้</h2>
+        <p>
+          @if(upcoming.length > 0)
+            วันนี้มีการแจ้งเตือนรอส่งอีก {{ upcoming.length }} รายการ
+          @else
+            ไม่มีการแจ้งเตือนรอส่งแล้วสำหรับวันนี้
+          @end
+        </p>
       </div>
-
-      <div class="stat-card">
-        <p class="stat-label">กลุ่ม LINE</p>
-        <p class="stat-value">{{ stats.active_groups }}</p>
-        <span class="stat-trend flat"><i class="bi bi-people"></i> ใช้งานอยู่</span>
-        <div class="stat-icon tone-info"><i class="bi bi-people"></i></div>
+      <div class="hero-stats">
+        <div class="hero-stat"><i class="bi bi-send-check" aria-hidden="true"></i><div><span>ส่งแล้ววันนี้</span><b>{{ stats.today_logs }}</b></div></div>
+        <div class="hero-stat"><i class="bi bi-graph-up-arrow" aria-hidden="true"></i><div><span>อัตราสำเร็จ</span><b>{{ stats.today_logs > 0 ? stats.success_rate + '%' : '—' }}</b></div></div>
+        <div class="hero-stat"><i class="bi bi-alarm" aria-hidden="true"></i><div><span>รอบถัดไป</span><b>{{ upcoming.length > 0 ? upcoming[0].time : '—' }}</b></div></div>
       </div>
-
-      <div class="stat-card">
-        <p class="stat-label">ส่งแล้ววันนี้</p>
-        <p class="stat-value">{{ stats.today_logs }}</p>
-        <span class="stat-trend flat"><i class="bi bi-calendar-event"></i> {{ today }}</span>
-        <div class="stat-icon tone-warning"><i class="bi bi-send-check"></i></div>
-      </div>
-
-      <div class="stat-card">
-        <p class="stat-label">อัตราสำเร็จวันนี้</p>
-        <p class="stat-value">{{ stats.success_rate }}%</p>
-        <span class="stat-trend flat"><i class="bi bi-graph-up"></i> ผลรวมการส่ง</span>
-        <div class="stat-icon {{ rateTone }}"><i class="bi bi-graph-up"></i></div>
-      </div>
-
-      <div class="stat-card">
-        <p class="stat-label">เทมเพลต</p>
-        <p class="stat-value">{{ stats.total_templates }}</p>
-        <span class="stat-trend flat"><i class="bi bi-file-earmark-text"></i> ทั้งหมด</span>
-        <div class="stat-icon tone-neutral"><i class="bi bi-file-earmark-text"></i></div>
-      </div>
-
-      <div class="stat-card">
-        <p class="stat-label">รายการ SQL</p>
-        <p class="stat-value">{{ stats.total_items }}</p>
-        <span class="stat-trend flat"><i class="bi bi-database"></i> ตัวแปร</span>
-        <div class="stat-icon tone-neutral"><i class="bi bi-database"></i></div>
-      </div>
+      <i class="bi bi-chat-dots-fill hero-mark" aria-hidden="true"></i>
     </section>
 
-    <div class="row g-4">
-      <div class="col-lg-8">
-        <div class="card-modern mb-4">
+    {{-- ===== KPIs ===== --}}
+    <section class="stat-grid mb-4" aria-label="สถิติภาพรวม">
+      <a href="/schedules" class="stat-card">
+        <p class="stat-label">ตารางเวลาที่ใช้งาน</p>
+        <p class="stat-value">{{ stats.active_schedules }}</p>
+        <span class="stat-trend flat">active</span>
+        <div class="stat-icon tone-brand"><i class="bi bi-calendar3" aria-hidden="true"></i></div>
+      </a>
+
+      <a href="{{ myRank >= roleRank.admin ? '/groups' : '/logs' }}" class="stat-card">
+        <p class="stat-label">กลุ่ม LINE</p>
+        <p class="stat-value">{{ stats.active_groups }}</p>
+        <span class="stat-trend flat">ใช้งานอยู่</span>
+        <div class="stat-icon tone-info"><i class="bi bi-people" aria-hidden="true"></i></div>
+      </a>
+
+      <a href="/logs" class="stat-card">
+        <p class="stat-label">ส่งแล้ววันนี้</p>
+        <p class="stat-value">{{ stats.today_logs }}</p>
+        <span class="stat-trend flat">วันนี้</span>
+        <div class="stat-icon tone-warning"><i class="bi bi-send-check" aria-hidden="true"></i></div>
+      </a>
+
+      <a href="/logs" class="stat-card">
+        <p class="stat-label">อัตราสำเร็จวันนี้</p>
+        <p class="stat-value">{{ stats.success_rate }}%</p>
+        @if(stats.today_logs === 0)
+          <span class="stat-trend flat">ยังไม่มีการส่ง</span>
+        @elseif(stats.success_rate >= 90)
+          <span class="stat-trend up">ดีมาก</span>
+        @else
+          <span class="stat-trend down">ควรตรวจสอบ</span>
+        @end
+        <div class="stat-icon {{ rateTone }}"><i class="bi bi-graph-up" aria-hidden="true"></i></div>
+      </a>
+
+      <a href="/templates" class="stat-card">
+        <p class="stat-label">เทมเพลต</p>
+        <p class="stat-value">{{ stats.total_templates }}</p>
+        <span class="stat-trend flat">ทั้งหมด</span>
+        <div class="stat-icon tone-violet"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></div>
+      </a>
+
+      <a href="{{ myRank >= roleRank.operator ? '/items' : '/templates' }}" class="stat-card">
+        <p class="stat-label">รายการ SQL</p>
+        <p class="stat-value">{{ stats.total_items }}</p>
+        <span class="stat-trend flat">ตัวแปร</span>
+        <div class="stat-icon tone-neutral"><i class="bi bi-database" aria-hidden="true"></i></div>
+      </a>
+    </section>
+
+    {{-- ===== Chart + upcoming ===== --}}
+    <div class="row g-4 mb-4">
+      <div class="col-xl-8">
+        <div class="card-modern h-100">
           <div class="card-modern-header">
-            <h2><i class="bi bi-bar-chart text-brand"></i> สถิติการส่ง 7 วันล่าสุด</h2>
+            <h2><i class="bi bi-bar-chart" aria-hidden="true"></i><span>สถิติการส่ง 7 วันล่าสุด<small>รวม {{ weekTotal }} ครั้ง · ล้มเหลว {{ weekFailed }} ครั้ง</small></span></h2>
+            <div class="bar-chart-legend">
+              <span><i style="background:var(--brand);"></i>สำเร็จ</span>
+              <span><i style="background:var(--danger);"></i>ล้มเหลว</span>
+            </div>
           </div>
           <div class="card-modern-body">
-            <canvas id="weeklyChart" height="120" role="img" aria-label="กราฟแท่งแสดงจำนวนการส่งสำเร็จและล้มเหลวใน 7 วันล่าสุด"></canvas>
-          </div>
-        </div>
-
-        <div class="card-modern">
-          <div class="card-modern-header">
-            <h2><i class="bi bi-calendar-check text-brand"></i> ตารางเวลาที่ใช้งานอยู่</h2>
-            <a href="/schedules" class="btn-modern btn-soft btn-sm">
-              จัดการทั้งหมด <i class="bi bi-arrow-right" aria-hidden="true"></i>
-            </a>
-          </div>
-          <div class="card-modern-body" style="padding:0;">
-            @if(todaySchedules.length === 0)
-              <div class="empty-state">
-                <i class="bi bi-calendar-x"></i>
-                <h4>ยังไม่มีตารางเวลา</h4>
-                <p>สร้างตารางเวลาแรกเพื่อเริ่มส่งข้อความอัตโนมัติ</p>
-                <a href="/schedules" class="btn-modern btn-brand">
-                  <i class="bi bi-plus-lg" aria-hidden="true"></i> สร้างตารางเวลา
-                </a>
-              </div>
-            @else
-              <div class="table-responsive">
-                <table class="table-modern">
-                  <thead>
-                    <tr>
-                      <th>ชื่อ</th>
-                      <th>เวลา</th>
-                      <th>วัน</th>
-                      <th>ส่งล่าสุด</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @each(s in todaySchedules)
-                      <tr>
-                        <td>
-                          <strong>{{ s.name }}</strong>
-                          @if(s.repeat_enabled)
-                            <span class="badge-modern badge-brand ms-1">repeat</span>
-                          @end
-                        </td>
-                        <td><span class="kbd">{{ s.send_time }}</span></td>
-                        <td>
-                          <div class="chip-list">
-                            @each(d in s.days)
-                              <span class="chip">{{ dayShort[d - 1] }}</span>
-                            @end
-                          </div>
-                        </td>
-                        <td><small class="text-muted-soft">{{ s.last_sent_date ?? '—' }}</small></td>
-                      </tr>
-                    @end
-                  </tbody>
-                </table>
-              </div>
-            @end
+            <div class="bar-chart" role="img" aria-label="กราฟแท่งจำนวนการส่งสำเร็จและล้มเหลวใน 7 วันล่าสุด">
+              @each((r, i) in weeklyStats)
+                <div class="bar {{ i === weeklyStats.length - 1 ? 'is-today' : '' }}">
+                  @if(r.total === 0)
+                    <div class="stack is-empty" style="--i:{{ i }};"></div>
+                  @else
+                    <div class="stack" style="--i:{{ i }};height:{{ (r.total / weekMax) * 88 }}%;">
+                      <div class="ok" style="flex:{{ r.success }};"></div>
+                      @if(r.total - r.success > 0)
+                        <div class="fail" style="flex:{{ r.total - r.success }};"></div>
+                      @end
+                    </div>
+                  @end
+                  <div class="bar-tip">{{ r.date }} · สำเร็จ {{ r.success }} · ล้มเหลว {{ r.total - r.success }}</div>
+                  <span class="bar-label">{{ r.day }}</span>
+                </div>
+              @end
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="col-lg-4">
-        <div class="card-modern">
+      <div class="col-xl-4">
+        <div class="card-modern h-100">
           <div class="card-modern-header">
-            <h2><i class="bi bi-clock-history text-brand"></i> ประวัติล่าสุด</h2>
-            <a href="/logs" class="btn-modern btn-soft btn-sm">
-              ดูทั้งหมด <i class="bi bi-arrow-right" aria-hidden="true"></i>
-            </a>
+            <h2><i class="bi bi-alarm" aria-hidden="true"></i><span>รอส่งวันนี้<small>{{ upcoming.length > 0 ? upcoming.length + ' รายการที่เหลือ' : 'ไม่มีรายการเหลือ' }}</small></span></h2>
+            <a href="/schedules" class="btn-modern btn-ghost btn-sm">ทั้งหมด <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
           </div>
-          <div class="card-modern-body" style="padding:0;">
-            @if(recentLogs.length === 0)
-              <div class="empty-state" style="padding:24px;">
-                <i class="bi bi-inbox"></i>
-                <h4>ยังไม่มีประวัติ</h4>
-              </div>
-            @else
-              <ul class="list-modern">
-                @each(log in recentLogs)
-                  <li class="list-modern-item">
-                    <div class="d-flex justify-content-between align-items-start gap-2">
-                      <div class="flex-grow-1" style="min-width:0;">
-                        <strong style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                          {{ log.group_name ?? '—' }}
-                        </strong>
-                        <small class="text-muted-soft">
-                          {{ log.schedule_name ?? 'ทดสอบ' }} · {{ log.sent_at }}
-                        </small>
-                      </div>
-                      @if(log.status_code === 200)
-                        <span class="badge-modern badge-success">200</span>
-                      @else
-                        <span class="badge-modern badge-danger">{{ log.status_code ?? '—' }}</span>
-                      @end
-                    </div>
-                  </li>
-                @end
-              </ul>
-            @end
-          </div>
+          @if(upcoming.length === 0)
+            <div class="empty-state">
+              <i class="bi bi-check2-all" aria-hidden="true"></i>
+              <h4>ส่งครบแล้ววันนี้</h4>
+              <p>ไม่มีตารางเวลาที่รอส่งในวันนี้</p>
+            </div>
+          @else
+            <ul class="timeline">
+              @each(u in upcoming.slice(0, 6))
+                <li>
+                  <div class="tl-time">{{ u.time }}<small>น.</small></div>
+                  <div class="tl-body">
+                    <b>{{ u.name }}</b>
+                    <span>{{ u.group_count }} กลุ่ม{{ u.repeat_enabled ? ' · repeat' : '' }}</span>
+                  </div>
+                  <span class="tl-in {{ u.minutes_until <= 30 ? 'is-soon' : '' }}">{{ untilLabel(u.minutes_until) }}</span>
+                </li>
+              @end
+            </ul>
+          @end
         </div>
       </div>
     </div>
+
+    {{-- ===== Schedules + recent logs ===== --}}
+    <div class="row g-4 mb-4">
+      <div class="col-xl-8">
+        <div class="card-modern h-100">
+          <div class="card-modern-header">
+            <h2><i class="bi bi-calendar-check" aria-hidden="true"></i><span>ตารางเวลาที่ใช้งานอยู่</span></h2>
+            @if(todaySchedules.length > 0)
+              <div class="filter-chips" role="group" aria-label="กรองตารางเวลา" data-schedule-filter>
+                <button type="button" class="filter-chip is-on" data-filter="all" aria-pressed="true">ทั้งหมด <span class="n">{{ todaySchedules.length }}</span></button>
+                <button type="button" class="filter-chip" data-filter="today" aria-pressed="false">วันนี้ <span class="n">{{ todayCount }}</span></button>
+                <button type="button" class="filter-chip" data-filter="repeat" aria-pressed="false">Repeat <span class="n">{{ repeatCount }}</span></button>
+              </div>
+            @end
+          </div>
+          @if(todaySchedules.length === 0)
+            <div class="empty-state">
+              <i class="bi bi-calendar-x" aria-hidden="true"></i>
+              <h4>ยังไม่มีตารางเวลา</h4>
+              <p>สร้างตารางเวลาแรกเพื่อเริ่มส่งข้อความอัตโนมัติ</p>
+              <a href="/schedules" class="btn-modern btn-brand">
+                <i class="bi bi-plus-lg" aria-hidden="true"></i> สร้างตารางเวลา
+              </a>
+            </div>
+          @else
+            <div class="table-responsive">
+              <table class="table-modern">
+                <thead>
+                  <tr>
+                    <th>ชื่อตารางเวลา</th>
+                    <th>เวลา</th>
+                    <th class="d-none d-md-table-cell">วัน</th>
+                    <th class="d-none d-lg-table-cell">ส่งล่าสุด</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @each((s, i) in todaySchedules)
+                    <tr data-today="{{ isToday(s) ? 1 : 0 }}" data-repeat="{{ s.repeat_enabled ? 1 : 0 }}">
+                      <td>
+                        <div class="sched-name">
+                          <span class="tone-tile {{ rowTones[i % rowTones.length] }}"><i class="bi bi-bell" aria-hidden="true"></i></span>
+                          <div style="min-width:0;">
+                            <b>{{ s.name }}</b>
+                            <small>
+                              {{ s.group_count }} กลุ่ม
+                              @if(s.repeat_enabled)
+                                · <span class="badge-modern badge-brand">repeat</span>
+                              @end
+                            </small>
+                          </div>
+                        </div>
+                      </td>
+                      <td><span class="mono">{{ s.send_time }}</span></td>
+                      <td class="d-none d-md-table-cell">
+                        @if(s.mode === 'monthly')
+                          <span class="chip">วันที่ {{ s.days.join(', ') }}</span>
+                        @elseif(s.mode === 'specific')
+                          <span class="chip">ระบุวันที่</span>
+                        @else
+                          <div class="day-dots">
+                            @each(d in weekOrder)
+                              <span class="{{ s.days.includes(d) ? 'is-on' : '' }} {{ d === 1 || d === 7 ? 'is-weekend' : '' }}">{{ dayShort[d - 1] }}</span>
+                            @end
+                          </div>
+                        @end
+                      </td>
+                      <td class="d-none d-lg-table-cell">
+                        @if(s.last_sent_date === today)
+                          <span class="badge-modern badge-success"><i class="bi bi-check2" aria-hidden="true"></i> วันนี้</span>
+                        @elseif(s.last_sent_date)
+                          <span class="badge-modern badge-neutral">{{ s.last_sent_date }}</span>
+                        @else
+                          <span class="badge-modern badge-neutral">ยังไม่เคยส่ง</span>
+                        @end
+                      </td>
+                    </tr>
+                  @end
+                </tbody>
+              </table>
+            </div>
+          @end
+        </div>
+      </div>
+
+      <div class="col-xl-4">
+        <div class="card-modern h-100">
+          <div class="card-modern-header">
+            <h2><i class="bi bi-activity" aria-hidden="true"></i><span>ประวัติล่าสุด</span></h2>
+            <a href="/logs" class="btn-modern btn-ghost btn-sm">ดูทั้งหมด <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+          </div>
+          @if(recentLogs.length === 0)
+            <div class="empty-state">
+              <i class="bi bi-inbox" aria-hidden="true"></i>
+              <h4>ยังไม่มีประวัติ</h4>
+              <p>เมื่อระบบส่งข้อความ รายการจะแสดงที่นี่</p>
+            </div>
+          @else
+            <ul class="feed">
+              @each(log in recentLogs)
+                <li>
+                  @if(log.status_code === 200)
+                    <span class="feed-status is-ok"><i class="bi bi-check2" aria-hidden="true"></i></span>
+                  @else
+                    <span class="feed-status is-fail"><i class="bi bi-exclamation-lg" aria-hidden="true"></i></span>
+                  @end
+                  <div class="feed-body">
+                    <b>{{ log.group_name ?? '—' }}</b>
+                    <span>{{ log.schedule_name ?? 'ทดสอบ' }} · {{ log.sent_at }}</span>
+                  </div>
+                  <span class="badge-modern {{ log.status_code === 200 ? 'badge-success' : 'badge-danger' }}">{{ log.status_code ?? '—' }}</span>
+                </li>
+              @end
+            </ul>
+          @end
+        </div>
+      </div>
+    </div>
+
+    {{-- ===== Quick access ===== --}}
+    <section>
+      <h3 class="section-title">เข้าถึงด่วน</h3>
+      <div class="module-grid">
+        <a href="/templates" class="module-card t-violet"><span class="tone-tile"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></span><span class="module-text"><b>เทมเพลตข้อความ</b><span>สร้าง Flex / ข้อความ</span></span><span class="module-go"><i class="bi bi-arrow-right" aria-hidden="true"></i></span></a>
+        @if(myRank >= roleRank.operator)
+          <a href="/items" class="module-card t-slate"><span class="tone-tile"><i class="bi bi-database" aria-hidden="true"></i></span><span class="module-text"><b>รายการข้อมูล</b><span>คำสั่ง SQL จาก HIS</span></span><span class="module-go"><i class="bi bi-arrow-right" aria-hidden="true"></i></span></a>
+        @end
+        @if(myRank >= roleRank.admin)
+          <a href="/groups" class="module-card t-sky"><span class="tone-tile"><i class="bi bi-people" aria-hidden="true"></i></span><span class="module-text"><b>กลุ่ม LINE</b><span>จัดการ token กลุ่ม</span></span><span class="module-go"><i class="bi bi-arrow-right" aria-hidden="true"></i></span></a>
+        @end
+        @if(myRank >= roleRank.operator)
+          <a href="/cdcu" class="module-card t-rose"><span class="tone-tile"><i class="bi bi-virus2" aria-hidden="true"></i></span><span class="module-text"><b>CDCU เฝ้าระวังโรค</b><span>แจ้งเตือนโรคติดต่อ</span></span><span class="module-go"><i class="bi bi-arrow-right" aria-hidden="true"></i></span></a>
+          <a href="/cron" class="module-card t-teal"><span class="tone-tile"><i class="bi bi-cpu" aria-hidden="true"></i></span><span class="module-text"><b>การทำงาน Cron</b><span>Log และสถานะ</span></span><span class="module-go"><i class="bi bi-arrow-right" aria-hidden="true"></i></span></a>
+        @end
+        <a href="/settings" class="module-card t-green"><span class="tone-tile"><i class="bi bi-gear" aria-hidden="true"></i></span><span class="module-text"><b>ตั้งค่าระบบ</b><span>ฐานข้อมูล · องค์กร</span></span><span class="module-go"><i class="bi bi-arrow-right" aria-hidden="true"></i></span></a>
+      </div>
+    </section>
   @end
 
   @slot('scripts')
     <script>
       document.addEventListener('DOMContentLoaded', function () {
-        const weekly = {{{ JSON.stringify(weeklyStats) }}};
-        const labels = weekly.map(r => r.day);
-        const success = weekly.map(r => r.success);
-        const failed = weekly.map(r => r.total - r.success);
-
-        const el = document.getElementById('weeklyChart');
-        if (!el || !window.Chart) return;
-
-        new Chart(el, {
-          type: 'bar',
-          data: {
-            labels,
-            datasets: [
-              { label: 'สำเร็จ', data: success, backgroundColor: '#06c755' },
-              { label: 'ล้มเหลว', data: failed, backgroundColor: '#dc2626' },
-            ],
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              x: { stacked: true },
-              y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } },
-            },
-            plugins: {
-              legend: { position: 'bottom' },
-            },
-          },
+        const bar = document.querySelector('[data-schedule-filter]');
+        if (!bar) return;
+        const rows = document.querySelectorAll('tr[data-today]');
+        bar.addEventListener('click', function (e) {
+          const btn = e.target.closest('[data-filter]');
+          if (!btn) return;
+          bar.querySelectorAll('[data-filter]').forEach(b => {
+            b.classList.toggle('is-on', b === btn);
+            b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+          });
+          const f = btn.dataset.filter;
+          rows.forEach(r => {
+            r.hidden = (f === 'today' && r.dataset.today !== '1') || (f === 'repeat' && r.dataset.repeat !== '1');
+          });
         });
       });
     </script>

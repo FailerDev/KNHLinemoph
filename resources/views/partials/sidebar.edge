@@ -6,7 +6,7 @@
   so each page sees the same role-filtered nav.
 --}}
 @let(navItems = [
-  { key: 'dashboard', title: 'แดชบอร์ด',       icon: 'speedometer2',      group: 'main',   role: 'viewer'   },
+  { key: 'dashboard', title: 'แดชบอร์ด',       icon: 'grid-1x2',          group: 'main',   role: 'viewer'   },
   { key: 'schedules', title: 'ตารางเวลา',       icon: 'calendar3',         group: 'main',   role: 'viewer'   },
   { key: 'logs',      title: 'ประวัติการส่ง',    icon: 'clock-history',     group: 'system', role: 'viewer'   },
   { key: 'templates', title: 'เทมเพลตข้อความ',  icon: 'file-earmark-text', group: 'data',   role: 'viewer'   },
@@ -23,13 +23,13 @@
 @let(myRank = roleRank[user?.role] ?? 0)
 
 <aside class="app-sidebar" aria-label="เมนูหลัก">
-  <div class="sidebar-brand">
-    <div class="brand-icon"><i class="bi bi-chat-dots-fill" aria-hidden="true"></i></div>
-    <div class="brand-text">
-      <h1>{{ appName() }}</h1>
-      <small>{{ orgName }}</small>
-    </div>
-  </div>
+  <a href="/dashboard" class="sidebar-brand">
+    <span class="brand-icon"><i class="bi bi-chat-dots-fill" aria-hidden="true"></i></span>
+    <span class="brand-text">
+      <h1>{{ siteTitle || appName() }}</h1>
+      <small title="{{ orgName }}">{{ orgName }}</small>
+    </span>
+  </a>
 
   <nav class="sidebar-nav">
     @each(groupKey in Object.keys(groupLabels))
@@ -37,7 +37,7 @@
       @if(groupVisible.length > 0)
         <div class="sidebar-section">{{ groupLabels[groupKey] }}</div>
         @each(item in groupVisible)
-          <a href="/{{ item.key }}" class="sidebar-link {{ currentPath === '/' + item.key ? 'is-active' : '' }}">
+          <a href="/{{ item.key }}" class="sidebar-link {{ currentPath === '/' + item.key ? 'is-active' : '' }}" data-nav-title="{{ item.title }}" data-nav-icon="{{ item.icon }}" {{{ currentPath === '/' + item.key ? 'aria-current="page"' : '' }}}>
             <i class="bi bi-{{ item.icon }}" aria-hidden="true"></i>
             <span>{{ item.title }}</span>
           </a>
@@ -47,6 +47,15 @@
   </nav>
 
   <div class="sidebar-footer">
-    <div>v{{ appVersion }} · FailerDev</div>
+    @if(myRank >= roleRank.operator)
+      <a href="/cron" class="sidebar-status" data-cron-status>
+        <span class="status-dot" data-cron-dot aria-hidden="true"></span>
+        <span>
+          <b data-cron-label>กำลังตรวจสอบ Cron…</b>
+          <span data-cron-detail>—</span>
+        </span>
+      </a>
+    @end
+    <div class="sidebar-version">v{{ appVersion }} · FailerDev</div>
   </div>
 </aside>

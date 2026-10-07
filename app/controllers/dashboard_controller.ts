@@ -2,9 +2,15 @@ import type { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
 import db from '@adonisjs/lucid/services/db'
 import NotificationSchedule from '#models/notification_schedule'
+import ScheduleCalculator from '#services/schedule_calculator'
 
 const TZ = 'Asia/Bangkok'
 const THAI_DAYS = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส']
+const THAI_DAYS_FULL = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์']
+const THAI_MONTHS = [
+  'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
+]
 
 export default class DashboardController {
   /**
@@ -76,8 +82,33 @@ export default class DashboardController {
         .map((n) => parseInt(n.trim(), 10))
         .filter(Boolean),
       repeat_enabled: !!s.repeatEnabled,
+      group_count: (s.groupIds ?? []).length,
       last_sent_date: s.lastSentDate?.toFormat('yyyy-MM-dd') ?? null,
     }))
+
+    // Remaining sends today: repeat schedules use their stored next_send_time,
+    // everything else asks the calculator for the next eligible slot.
+    const upcoming = schedules
+      .map((s) => {
+        const next =
+          s.repeatEnabled && s.nextSendTime
+            ? s.nextSendTime.setZone(TZ)
+            : ScheduleCalculator.calculateNextSendTime(s)
+        return { s, next }
+      })
+      .filter(({ next }) => next && next >= now && next.hasSame(now, 'day'))
+      .sort((a, b) => a.next!.toMillis() - b.next!.toMillis())
+      .map(({ s, next }) => ({
+        id: s.id,
+        name: s.scheduleName,
+        time: next!.toFormat('HH:mm'),
+        minutes_until: Math.max(0, Math.round(next!.diff(now, 'minutes').minutes)),
+        group_count: (s.groupIds ?? []).length,
+        repeat_enabled: !!s.repeatEnabled,
+      }))
+
+    const wd = now.weekday === 7 ? 0 : now.weekday
+    const todayLabel = `วัน${THAI_DAYS_FULL[wd]}ที่ ${now.day} ${THAI_MONTHS[now.month - 1]} ${now.year + 543}`
 
     return view.render('pages/dashboard', {
       title: 'แดชบอร์ด',
@@ -85,7 +116,10 @@ export default class DashboardController {
       recentLogs,
       todaySchedules,
       weeklyStats: weeklyRows,
+      upcoming,
       today,
+      todayLabel,
+      todayDow: wd + 1,
     })
   }
 

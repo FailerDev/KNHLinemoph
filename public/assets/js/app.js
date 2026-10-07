@@ -17,6 +17,9 @@
             this.bootDayChips();
             this.bootSubmitGuards();
             this.bootFlashMessages();
+            this.bootNavSearch();
+            this.bootCronStatus();
+            this.bootManual();
         },
 
         // ---- Toasts ------------------------------------------------
@@ -97,7 +100,7 @@
                     title: o.title, text: o.text, icon: o.icon,
                     showCancelButton: true,
                     confirmButtonText: o.confirmText, cancelButtonText: o.cancelText,
-                    confirmButtonColor: o.danger ? '#dc2626' : '#06c755',
+                    confirmButtonColor: o.danger ? '#dc2626' : '#00a047',
                     cancelButtonColor: '#94a3b8',
                     customClass: { popup: 'swal-modern' },
                 });
@@ -310,6 +313,149 @@
                         });
                 });
             });
+        },
+
+        // ---- Topbar quick-jump: filters sidebar links (Ctrl/⌘+K) ----
+        bootNavSearch() {
+            const input = document.querySelector('[data-nav-search]');
+            const list  = document.getElementById('navSearchResults');
+            if (!input || !list) return;
+
+            const pages = [...document.querySelectorAll('.sidebar-link[data-nav-title]')].map(a => ({
+                href: a.getAttribute('href'),
+                title: a.dataset.navTitle,
+                icon: a.dataset.navIcon,
+            }));
+            let matches = [];
+            let active = 0;
+
+            const close = () => { list.classList.remove('is-open'); input.setAttribute('aria-expanded', 'false'); };
+            const render = () => {
+                const q = input.value.trim().toLowerCase();
+                matches = q ? pages.filter(p => p.title.toLowerCase().includes(q) || p.href.includes(q)) : pages;
+                active = Math.min(active, Math.max(matches.length - 1, 0));
+                list.innerHTML = matches.length
+                    ? matches.map((p, i) => `<li><a href="${p.href}" role="option" class="${i === active ? 'is-active' : ''}"><i class="bi bi-${p.icon}" aria-hidden="true"></i><span></span></a></li>`).join('')
+                    : '<li class="search-empty">ไม่พบเมนู</li>';
+                list.querySelectorAll('a span').forEach((el, i) => { el.textContent = matches[i].title; });
+                list.classList.add('is-open');
+                input.setAttribute('aria-expanded', 'true');
+            };
+
+            input.addEventListener('focus', render);
+            input.addEventListener('input', () => { active = 0; render(); });
+            input.addEventListener('blur', () => setTimeout(close, 150));
+            input.addEventListener('keydown', e => {
+                if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (!matches.length) return;
+                    active = (active + (e.key === 'ArrowDown' ? 1 : -1) + matches.length) % matches.length;
+                    render();
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (matches[active]) window.location.href = matches[active].href;
+                } else if (e.key === 'Escape') {
+                    input.blur();
+                }
+            });
+            document.addEventListener('keydown', e => {
+                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+                    e.preventDefault();
+                    input.focus();
+                    input.select();
+                }
+            });
+        },
+
+        // ---- Sidebar cron heartbeat (operator+ only; card absent otherwise) ----
+        bootCronStatus() {
+            const card = document.querySelector('[data-cron-status]');
+            if (!card) return;
+            const dot    = card.querySelector('[data-cron-dot]');
+            const label  = card.querySelector('[data-cron-label]');
+            const detail = card.querySelector('[data-cron-detail]');
+
+            const refresh = async () => {
+                const res = await App.ajax('/cron/status', {}, { loader: false, autoToast: false });
+                dot.classList.remove('is-online', 'is-warning', 'is-offline');
+                if (!res.success) {
+                    dot.classList.add('is-warning');
+                    label.textContent = 'ตรวจสอบ Cron ไม่ได้';
+                    detail.textContent = 'ลองใหม่ภายหลัง';
+                    return;
+                }
+                const age = res.data.last_tick_age_sec;
+                if (age == null) {
+                    dot.classList.add('is-warning');
+                    label.textContent = 'Cron ยังไม่ทำงานวันนี้';
+                    detail.textContent = 'ยังไม่มี log ของวันนี้';
+                } else if (age < 90) {
+                    dot.classList.add('is-online');
+                    label.textContent = 'Cron ทำงานปกติ';
+                    detail.textContent = `tick ล่าสุด ${age} วินาทีที่แล้ว`;
+                } else {
+                    dot.classList.add('is-offline');
+                    label.textContent = 'Cron ไม่ตอบสนอง';
+                    detail.textContent = `tick ล่าสุด ${Math.round(age / 60)} นาทีที่แล้ว`;
+                }
+            };
+            refresh();
+            setInterval(refresh, 60000);
+        },
+
+        // ---- User manual (Settings → คู่มือ) ----------------------
+        bootManual() {
+            const showTab = (sel) => {
+                const btn = document.querySelector(`[data-bs-target="${sel}"]`);
+                if (btn && window.bootstrap) bootstrap.Tab.getOrCreateInstance(btn).show();
+            };
+
+            // /settings#help or /settings#man-xxx opens the manual tab directly
+            const hash = window.location.hash;
+            if (hash === '#help' || hash.startsWith('#man-')) {
+                showTab('#tab-help');
+                if (hash.startsWith('#man-')) setTimeout(() => document.querySelector(hash)?.scrollIntoView(), 200);
+            }
+
+            const manual = document.querySelector('.manual');
+            if (!manual) return;
+
+            // In-manual links that jump to another settings tab
+            manual.querySelectorAll('[data-manual-tab]').forEach(a => a.addEventListener('click', e => {
+                e.preventDefault();
+                showTab(a.dataset.manualTab);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }));
+
+            const sections = [...manual.querySelectorAll('.manual-section')];
+            const tocLinks = [...manual.querySelectorAll('.manual-toc nav a')];
+
+            // Search: hide sections without a match, dim their TOC entries
+            const input = document.getElementById('manualSearch');
+            const empty = document.getElementById('manualEmpty');
+            input?.addEventListener('input', () => {
+                const q = input.value.trim().toLowerCase();
+                let shown = 0;
+                sections.forEach(sec => {
+                    const hit = !q || sec.textContent.toLowerCase().includes(q);
+                    sec.hidden = !hit;
+                    if (hit) shown++;
+                    const link = tocLinks.find(a => a.getAttribute('href') === '#' + sec.id);
+                    if (link) link.classList.toggle('is-dim', !hit);
+                });
+                if (empty) empty.hidden = shown > 0;
+            });
+
+            // Scroll-spy: highlight the section currently in view
+            if ('IntersectionObserver' in window) {
+                const io = new IntersectionObserver(entries => {
+                    entries.forEach(en => {
+                        if (!en.isIntersecting) return;
+                        tocLinks.forEach(a => a.classList.toggle('is-active', a.getAttribute('href') === '#' + en.target.id));
+                    });
+                }, { rootMargin: '-90px 0px -65% 0px' });
+                sections.forEach(sec => io.observe(sec));
+            }
         },
 
         // ---- Auto-show server flash messages as toast -------------

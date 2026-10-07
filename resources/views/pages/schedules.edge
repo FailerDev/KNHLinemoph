@@ -5,18 +5,18 @@
 
     <div class="card-modern mb-4">
       <div class="card-modern-header">
-        <h2><i class="bi bi-calendar3 text-brand" aria-hidden="true"></i> ตารางเวลาทั้งหมด <span class="text-muted-soft">({{ schedules.length }})</span></h2>
+        <h2><i class="bi bi-calendar3 text-brand" aria-hidden="true"></i> ตารางเวลาทั้งหมด <span class="text-muted-soft">{{ schedules.length }}</span></h2>
         <button class="btn-modern btn-brand" data-action="new-schedule">
           <i class="bi bi-plus-lg" aria-hidden="true"></i> เพิ่มตารางเวลา
         </button>
       </div>
-      <div class="card-modern-body pb-0" style="border-bottom:1px solid var(--border);">
+      <div class="card-modern-body" style="padding-top:14px;padding-bottom:14px;">
         <div class="d-flex gap-2 align-items-center flex-wrap">
-          <div class="input-group" style="max-width:280px;">
+          <div class="input-group input-group-sm" style="max-width:280px;">
             <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
             <input type="text" class="form-control" id="scheduleSearch" placeholder="ค้นหาชื่อตาราง..." aria-label="ค้นหาชื่อตารางเวลา">
           </div>
-          <select class="form-select" id="scheduleStatusFilter" style="max-width:140px;" aria-label="กรองตามสถานะ">
+          <select class="form-select form-select-sm" id="scheduleStatusFilter" style="max-width:150px;height:38px;border-radius:999px;" aria-label="กรองตามสถานะ">
             <option value="">ทุกสถานะ</option>
             <option value="active">เปิดใช้งาน</option>
             <option value="inactive">ปิดใช้งาน</option>

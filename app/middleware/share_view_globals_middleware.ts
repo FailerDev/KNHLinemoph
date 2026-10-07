@@ -6,7 +6,10 @@ export default class ShareViewGlobalsMiddleware {
   async handle(ctx: HttpContext, next: NextFn) {
     await ctx.auth.check()
 
-    const orgName = await SettingsService.get('org_name', 'โรงพยาบาลแก้งสนามนาง')
+    const [orgName, siteTitle] = await Promise.all([
+      SettingsService.get('org_name', 'โรงพยาบาลแก้งสนามนาง'),
+      SettingsService.get('site_title', ''),
+    ])
 
     ctx.view.share({
       user: ctx.auth.user ?? null,
@@ -14,6 +17,8 @@ export default class ShareViewGlobalsMiddleware {
       csrfToken: ctx.request.csrfToken,
       flash: ctx.session.flashMessages.all(),
       orgName,
+      // Settings → "หัวข้อหลัก"; views fall back to appName() when empty
+      siteTitle: siteTitle?.trim() || null,
     })
 
     return next()

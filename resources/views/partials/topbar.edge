@@ -4,51 +4,65 @@
 --}}
 @let(roleRank = { viewer: 1, operator: 2, admin: 3 })
 @let(myRank = roleRank[user?.role] ?? 0)
+@let(roleLabels = { viewer: 'ผู้ดู', operator: 'ผู้ปฏิบัติงาน', admin: 'ผู้ดูแลระบบ' })
+@let(displayName = user ? (user.displayName || user.username) : '')
 
 <header class="app-topbar">
   <button type="button" class="topbar-toggle icon-btn" data-sidebar-toggle aria-label="เปิดเมนู">
-    <i class="bi bi-list" style="font-size:20px;" aria-hidden="true"></i>
+    <i class="bi bi-list" style="font-size:22px;" aria-hidden="true"></i>
   </button>
 
   <div class="page-title">
     <h1>{{ title ?? '' }}</h1>
     <div class="page-crumb">
-      <a href="/dashboard" class="text-muted-soft">หน้าแรก</a>
+      <a href="/dashboard">หน้าแรก</a>
       <span class="mx-1">/</span>
       <span>{{ title ?? '' }}</span>
     </div>
   </div>
 
+  <div class="topbar-search" role="search">
+    <i class="bi bi-search" aria-hidden="true"></i>
+    <input type="search" data-nav-search placeholder="ไปที่หน้า…" aria-label="ค้นหาเมนู" autocomplete="off"
+           aria-controls="navSearchResults" aria-expanded="false">
+    <kbd class="kbd">Ctrl K</kbd>
+    <ul class="search-results" id="navSearchResults" role="listbox"></ul>
+  </div>
+
   <div class="topbar-actions">
     @if(myRank >= roleRank.operator)
-      <button type="button" class="btn-modern btn-soft btn-sm" onclick="App.runCron()" aria-label="รัน Cron">
+      <button type="button" class="btn-modern btn-soft d-none d-sm-inline-flex" onclick="App.runCron()" aria-label="รัน Cron">
         <i class="bi bi-play-circle" aria-hidden="true"></i>
         <span class="d-none d-md-inline">รัน Cron</span>
       </button>
-      <button type="button" class="btn-modern btn-brand btn-sm" onclick="App.openTestSend()" aria-label="ส่งทดสอบ">
+      <button type="button" class="btn-modern btn-brand" onclick="App.openTestSend()" aria-label="ส่งทดสอบ">
         <i class="bi bi-send" aria-hidden="true"></i>
         <span class="d-none d-md-inline">ส่งทดสอบ</span>
       </button>
     @end
 
-    <button type="button" class="icon-btn" data-theme-toggle aria-label="สลับโหมด">
+    <button type="button" class="icon-btn" data-theme-toggle aria-label="สลับโหมดสว่าง/มืด">
       <i class="bi bi-moon" aria-hidden="true"></i>
     </button>
 
     @if(user)
       <div class="dropdown">
-        <button type="button" class="btn-modern btn-soft btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="เมนูผู้ใช้ {{ user.displayName || user.username }}">
-          <i class="bi bi-person-circle" aria-hidden="true"></i>
-          <span class="d-none d-md-inline">{{ user.displayName || user.username }}</span>
+        <button type="button" class="user-chip dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="เมนูผู้ใช้ {{ displayName }}">
+          <span class="user-avatar" aria-hidden="true">{{ String(user.username).slice(0, 2) }}</span>
+          <span class="user-meta">
+            <b>{{ displayName }}</b>
+            <span>{{ roleLabels[user.role] ?? user.role }}</span>
+          </span>
+          <i class="bi bi-chevron-down" aria-hidden="true"></i>
         </button>
         <ul class="dropdown-menu dropdown-menu-end">
-          <li>
-            <span class="dropdown-item-text" style="font-size:12px;color:var(--text-muted);">
-              <strong>{{ user.username }}</strong> · {{ user.role }}
-            </span>
+          <li class="dropdown-header-user">
+            <b>{{ displayName }}</b>
+            <span>{{ user.username }} · {{ roleLabels[user.role] ?? user.role }}</span>
           </li>
           <li><hr class="dropdown-divider"></li>
           <li><a class="dropdown-item" href="/users/profile"><i class="bi bi-person" aria-hidden="true"></i> โปรไฟล์</a></li>
+          <li><a class="dropdown-item" href="/settings#help"><i class="bi bi-book" aria-hidden="true"></i> คู่มือการใช้งาน</a></li>
           <li>
             <form method="POST" action="/logout" style="margin:0;">
               <input type="hidden" name="_csrf" value="{{ csrfToken }}">
